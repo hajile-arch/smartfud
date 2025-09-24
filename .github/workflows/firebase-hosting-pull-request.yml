@@ -20,7 +20,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18   # or your required version
+          node-version: 20   # ✅ Updated to Node.js 20 (required by Firebase CLI)
 
       - name: Install dependencies
         run: npm install
