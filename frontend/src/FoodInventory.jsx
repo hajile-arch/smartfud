@@ -54,3 +54,42 @@ const FoodInventory = () => {
     setAvailability("");
     setShowConvertModal(true);
   };
+
+  const handleConfirmConversion = async () => {
+    if (!pickupLocation || !availability) {
+      alert("Please fill in all fields");
+      return;
+    }
+    try {
+      const donationData = {
+        ...selectedItem,
+        status: "available",
+        pickupLocation,
+        availability,
+        contactInfo: user.email,
+        createdAt: new Date(),
+      };
+
+      await addDoc(
+        collection(db, "users", user.uid, "donations"),
+        donationData
+      );
+
+      await updateDoc(
+        doc(db, "users", user.uid, "inventory", selectedItem.id),
+        { status: "donated", donatedAt: new Date() }
+      );
+
+      await deleteDoc(doc(db, "users", user.uid, "inventory", selectedItem.id));
+
+      setItems((prevItems) =>
+        prevItems.filter((item) => item.id !== selectedItem.id)
+      );
+      alert("Item successfully converted to donation!");
+      setShowConvertModal(false);
+      setSelectedItem(null);
+    } catch (error) {
+      console.error("Error converting item:", error);
+      alert("Error converting item. Please try again.");
+    }
+  };
