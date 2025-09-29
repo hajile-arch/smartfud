@@ -93,3 +93,24 @@ const FoodInventory = () => {
       alert("Error converting item. Please try again.");
     }
   };
+
+  const [formData, setFormData] = useState({
+    name: "",
+    quantity: "",
+    expiry: "",
+    category: "",
+    location: "",
+    notes: "",
+  });
+
+  const categories = [
+    "Fruits & Vegetables",
+    "Dairy & Eggs",
+    "Meat & Poultry",
+    "Grains & Bread",
+    "Canned Goods",
+    "Frozen Foods",
+    "Beverages",
+    "Snacks",
+    "Other",
+  ];
