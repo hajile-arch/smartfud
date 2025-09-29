@@ -31,3 +31,19 @@ import {
   AlertTriangle,
   X,
 } from "lucide-react";
+
+const FoodInventory = () => {
+  const [foodItems, setFoodItems] = useState([]);
+  const [showConvertModal, setShowConvertModal] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [pickupLocation, setPickupLocation] = useState("");
+  const [availability, setAvailability] = useState("");
+  const [user, setUser] = useState(null);
+  const [items, setItems] = useState([]);
+  const [donations, setDonations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [expiryFilter, setExpiryFilter] = useState("all");
