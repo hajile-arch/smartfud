@@ -47,3 +47,10 @@ const FoodInventory = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [expiryFilter, setExpiryFilter] = useState("all");
+
+  const handleOpenConvertModal = (item) => {
+    setSelectedItem(item);
+    setPickupLocation("");
+    setAvailability("");
+    setShowConvertModal(true);
+  };
