@@ -514,3 +514,46 @@ return (
         </div>
       </div>
     )}
+{donations.length > 0 && (
+      <div className="mt-8 bg-white rounded-lg shadow-md">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">
+            Donation Listings ({donations.length})
+          </h2>
+        </div>
+
+        <div className="divide-y divide-gray-200">
+          {donations.map((donation) => (
+            <DonationItemDetails
+              key={donation.docId}
+              donation={donation}
+              onDelete={(id) => {
+                setDonations((prev) => prev.filter((d) => d.docId !== id));
+              }}
+              onUpdate={(id, updatedData) => {
+                setDonations((prev) =>
+                  prev.map((d) =>
+                    d.docId === id ? { ...d, ...updatedData } : d
+                  )
+                );
+              }}
+            />
+          ))}
+        </div>
+      </div>
+    )}
+
+    {/* git commit: feat: integrate ConvertDonationModal for converting inventory items to donations */}
+    <ConvertDonationModal
+      isOpen={showConvertModal}
+      onClose={() => setShowConvertModal(false)}
+      onConfirm={handleConfirmConversion}
+      pickupLocation={pickupLocation}
+      setPickupLocation={setPickupLocation}
+      availability={availability}
+      setAvailability={setAvailability}
+    />
+  </div>
+);
+
+export default FoodInventory;
