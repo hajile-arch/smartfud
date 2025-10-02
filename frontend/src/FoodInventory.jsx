@@ -307,3 +307,38 @@ const FoodInventory = () => {
 
   // ... rest of UI code for inventory list, donation list, modals ...
 };
+
+const isExpiringSoon = (expiryDate) => {
+    const today = new Date();
+    const threeDaysFromNow = new Date(today);
+    threeDaysFromNow.setDate(today.getDate() + 3);
+    return expiryDate <= threeDaysFromNow && expiryDate >= today;
+  };
+
+  const isExpired = (expiryDate) => {
+    return expiryDate < new Date();
+  };
+
+  const filteredItems = items.filter((item) => {
+    const matchesSearch = item.name
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase());
+    const matchesCategory =
+      categoryFilter === "all" || item.category === categoryFilter;
+
+    let matchesExpiry = true;
+    if (expiryFilter === "expiring") {
+      matchesExpiry = isExpiringSoon(item.expiry);
+    } else if (expiryFilter === "expired") {
+      matchesExpiry = isExpired(item.expiry);
+    } else if (expiryFilter === "safe") {
+      matchesExpiry = !isExpiringSoon(item.expiry) && !isExpired(item.expiry);
+    }
+
+    return (
+      matchesSearch &&
+      matchesCategory &&
+      matchesExpiry &&
+      (item.status === "active" || item.status === "donated")
+    );
+  });
