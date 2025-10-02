@@ -168,3 +168,82 @@ const FoodInventory = () => {
       unsubscribeDonations();
     };
   };
+
+   const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (
+      !formData.name ||
+      !formData.quantity ||
+      !formData.expiry ||
+      !formData.category
+    ) {
+      alert("Please complete all required fields");
+      return;
+    }
+
+    try {
+      const itemData = {
+        ...formData,
+        quantity: parseInt(formData.quantity),
+        expiry: new Date(formData.expiry),
+        createdAt: new Date(),
+        status: "active",
+        userId: user.uid,
+      };
+
+      if (editingItem) {
+        await updateDoc(
+          doc(db, "users", user.uid, "inventory", editingItem.id),
+          itemData
+        );
+      } else {
+        await addDoc(collection(db, "users", user.uid, "inventory"), itemData);
+      }
+
+      setFormData({
+        name: "",
+        quantity: "",
+        expiry: "",
+        category: "",
+        location: "",
+        notes: "",
+      });
+      setEditingItem(null);
+      setShowForm(false);
+    } catch (error) {
+      console.error("Error saving item:", error);
+      alert("Error saving item. Please try again.");
+    }
+  };
+
+  const handleEdit = (item) => {
+    setEditingItem(item);
+    setFormData({
+      name: item.name,
+      quantity: item.quantity.toString(),
+      expiry: item.expiry.toISOString().split("T")[0],
+      category: item.category,
+      location: item.location || "",
+      notes: item.notes || "",
+    });
+    setShowForm(true);
+  };
+
+  const handleDelete = async (itemId) => {
+    if (window.confirm("Are you sure you want to delete this item?")) {
+      try {
+        await deleteDoc(doc(db, "users", user.uid, "inventory", itemId));
+      } catch (error) {
+        console.error("Error deleting item:", error);
+        alert("Error deleting item. Please try again.");
+      }
+    }
+  };
