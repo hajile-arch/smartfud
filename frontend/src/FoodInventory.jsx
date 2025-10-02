@@ -366,4 +366,21 @@ if (loading) {
   }
 
   // ... rest of UI code for inventory list, donation list, modals ...
-//};
+};
+return (
+  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="flex justify-between items-center mb-8">
+      <div>
+        <h1 className="text-3xl font-bold text-gray-900">Food Inventory</h1>
+        <p className="text-gray-600 mt-2">
+          Manage your food items and reduce waste
+        </p>
+      </div>
+      <button
+        onClick={() => setShowForm(true)}
+        className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 flex items-center"
+      >
+        <Plus className="h-5 w-5 mr-2" />
+        Add Food Item
+      </button>
+    </div>
