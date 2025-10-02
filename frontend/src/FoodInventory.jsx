@@ -114,3 +114,57 @@ const FoodInventory = () => {
     "Snacks",
     "Other",
   ];
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
+      if (user) {
+        loadUserData(user.uid);
+      } else {
+        setLoading(false);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const loadUserData = (userId) => {
+    const inventoryQuery = query(
+      collection(db, "users", userId, "inventory"),
+      orderBy("expiry", "asc")
+    );
+
+    const unsubscribeInventory = onSnapshot(inventoryQuery, (snapshot) => {
+      const inventoryItems = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        expiry: doc.data().expiry?.toDate() || doc.data().expiry,
+      }));
+      setItems(inventoryItems);
+    });
+
+    const donationsQuery = query(
+      collection(db, "users", userId, "donations"),
+      orderBy("createdAt", "desc")
+    );
+
+    const unsubscribeDonations = onSnapshot(donationsQuery, (snapshot) => {
+      const donationItems = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          docId: doc.id,
+          ...data,
+          expiry: data.expiry?.toDate() || data.expiry,
+          createdAt: data.createdAt?.toDate
+            ? data.createdAt.toDate()
+            : data.createdAt,
+        };
+      });
+      setDonations(donationItems);
+    });
+
+    setLoading(false);
+    return () => {
+      unsubscribeInventory();
+      unsubscribeDonations();
+    };
+  };
