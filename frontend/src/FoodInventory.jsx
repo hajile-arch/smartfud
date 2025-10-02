@@ -247,3 +247,63 @@ const FoodInventory = () => {
       }
     }
   };
+
+  const isExpiringSoon = (expiryDate) => {
+    const today = new Date();
+    const threeDaysFromNow = new Date(today);
+    threeDaysFromNow.setDate(today.getDate() + 3);
+    return expiryDate <= threeDaysFromNow && expiryDate >= today;
+  };
+
+  const isExpired = (expiryDate) => {
+    return expiryDate < new Date();
+  };
+
+  const filteredItems = items.filter((item) => {
+    const matchesSearch = item.name
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase());
+    const matchesCategory =
+      categoryFilter === "all" || item.category === categoryFilter;
+
+    let matchesExpiry = true;
+    if (expiryFilter === "expiring") {
+      matchesExpiry = isExpiringSoon(item.expiry);
+    } else if (expiryFilter === "expired") {
+      matchesExpiry = isExpired(item.expiry);
+    } else if (expiryFilter === "safe") {
+      matchesExpiry = !isExpiringSoon(item.expiry) && !isExpired(item.expiry);
+    }
+
+    return (
+      matchesSearch &&
+      matchesCategory &&
+      matchesExpiry &&
+      (item.status === "active" || item.status === "donated")
+    );
+  });
+
+  // git commit: ui: add loading and unauthenticated user messages
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="text-center py-12">
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">
+          Please log in to manage your inventory
+        </h2>
+        <p className="text-gray-600">
+          You need to be authenticated to access the food inventory.
+        </p>
+      </div>
+    );
+  }
+
+  // ... rest of UI code for inventory list, donation list, modals ...
+};
