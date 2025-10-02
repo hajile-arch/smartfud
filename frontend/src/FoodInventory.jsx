@@ -384,3 +384,56 @@ return (
         Add Food Item
       </button>
     </div>
+
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="bg-white p-6 rounded-lg shadow-md">
+        <div className="flex items-center">
+          <Package className="h-8 w-8 text-blue-500" />
+          <div className="ml-4">
+            <p className="text-sm font-medium text-gray-600">Total Items</p>
+            <p className="text-2xl font-bold text-gray-900">
+              {items.filter((i) => i.status === "active").length}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white p-6 rounded-lg shadow-md">
+        <div className="flex items-center">
+          <AlertTriangle className="h-8 w-8 text-red-500" />
+          <div className="ml-4">
+            <p className="text-sm font-medium text-gray-600">Expiring Soon</p>
+            <p className="text-2xl font-bold text-red-600">
+              {items.filter(
+                (item) =>
+                  isExpiringSoon(item.expiry) && item.status === "active"
+              ).length}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white p-6 rounded-lg shadow-md">
+        <div className="flex items-center">
+          <Clock className="h-8 w-8 text-orange-500" />
+          <div className="ml-4">
+            <p className="text-sm font-medium text-gray-600">Expired</p>
+            <p className="text-2xl font-bold text-orange-600">
+              {items.filter(
+                (item) => isExpired(item.expiry) && item.status === "active"
+              ).length}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white p-6 rounded-lg shadow-md">
+        <div className="flex items-center">
+          <Gift className="h-8 w-8 text-green-500" />
+          <div className="ml-4">
+            <p className="text-sm font-medium text-gray-600">Donations</p>
+            <p className="text-2xl font-bold text-green-600">{donations.length}</p>
+          </div>
+        </div>
+      </div>
+    </div>
