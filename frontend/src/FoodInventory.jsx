@@ -342,3 +342,28 @@ const isExpiringSoon = (expiryDate) => {
       (item.status === "active" || item.status === "donated")
     );
   });
+
+
+if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="text-center py-12">
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">
+          Please log in to manage your inventory
+        </h2>
+        <p className="text-gray-600">
+          You need to be authenticated to access the food inventory.
+        </p>
+      </div>
+    );
+  }
+
+  // ... rest of UI code for inventory list, donation list, modals ...
+//};
