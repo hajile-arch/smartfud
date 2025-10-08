@@ -50,3 +50,25 @@ return (
               placeholder="e.g., Date/Time or specific details"
             />
           </div>
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <button
+              onClick={onConfirm}
+              className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600"
+            >
+              Confirm
+            </button>
+            <button
+              onClick={onClose}
+              className="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+      
+);
+};
+
+export default ConvertDonationModal;
