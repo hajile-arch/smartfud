@@ -13,3 +13,31 @@ const DonationItemDetails = ({ donation, onDelete, onUpdate }) => {
     pickupLocation: donation.pickupLocation || "",
     availability: donation.availability || "",
   });
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+   const handleSave = async () => {
+    try {
+      const donationRef = doc(db, "users", donation.userId, "donations", donation.docId);
+      await updateDoc(donationRef, {
+        name: formData.name,
+        quantity: parseInt(formData.quantity),
+        expiry: new Date(formData.expiry),
+        pickupLocation: formData.pickupLocation,
+        availability: formData.availability,
+      });
+      onUpdate(donation.docId, {
+        ...formData,
+        quantity: parseInt(formData.quantity),
+        expiry: new Date(formData.expiry),
+      });
+      setIsEditing(false);
+    } catch (error) {
+      console.error("Error updating donation:", error);
+      alert("Failed to update donation");
+    }
+  };
+
