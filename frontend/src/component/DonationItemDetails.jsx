@@ -106,3 +106,21 @@ return (
               onChange={handleChange}
               className="w-full border border-gray-300 rounded px-2 py-1"
             />
+          {/* git commit: ui: save and cancel buttons */}
+            <div className="flex space-x-2 mt-2">
+              <button
+                onClick={handleSave}
+                className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600"
+              >
+                Save
+              </button>
+              <button
+                onClick={() => setIsEditing(false)}
+                className="bg-gray-200 text-gray-700 px-3 py-1 rounded hover:bg-gray-300"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (  
