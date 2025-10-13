@@ -114,3 +114,52 @@ const handleOpenConvertModal = (item) => {
     "Snacks",
     "Other",
   ];
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
+      if (user) {
+        loadUserData(user.uid);
+      } else {
+        setLoading(false);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const loadUserData = (userId) => {
+    setLoading(true);
+
+    const inventoryQuery = query(
+      collection(db, "users", userId, "inventory"),
+      where("status", "in", ["active", "planned", "used", "donated"])
+    );
+    const unsubscribeInventory = onSnapshot(inventoryQuery, (snapshot) => {
+      const items = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        type: "inventory",
+        ...doc.data(),
+        expiry: doc.data().expiry?.toDate() || doc.data().expiry,
+      }));
+      setInventoryItems(items);
+      setLoading(false);
+    });
+
+    const donationsQuery = query(
+      collection(db, "users", userId, "donations")
+    );
+    const unsubscribeDonations = onSnapshot(donationsQuery, (snapshot) => {
+      const items = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        type: "donation",
+        ...doc.data(),
+        expiry: doc.data().expiry?.toDate() || doc.data().expiry,
+      }));
+      setDonationItems(items);
+    });
+
+    return () => {
+      unsubscribeInventory();
+      unsubscribeDonations();
+    };
+  };
