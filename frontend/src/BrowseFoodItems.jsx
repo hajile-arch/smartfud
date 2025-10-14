@@ -215,3 +215,121 @@ useEffect(() => {
   }
   setFilteredItems(items);
 }, [inventoryItems, donationItems, filters]);
+
+const handleFilterChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFilters((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+  };
+
+  const handleItemClick = (item) => {
+    setSelectedItem(item);
+    setShowDetails(true);
+  };
+
+  const handleAction = async (actionType) => {
+    if (!selectedItem || !user) return;
+    try {
+      if (selectedItem.type === "inventory") {
+        const itemRef = doc(
+          db,
+          "users",
+          user.uid,
+          "inventory",
+          selectedItem.id
+        );
+        await updateDoc(itemRef, { status: actionType });
+        setInventoryItems((prev) =>
+          prev.map((item) =>
+            item.id === selectedItem.id ? { ...item, status: actionType } : item
+          )
+        );
+      } else if (selectedItem.type === "donation") {
+        const itemRef = doc(
+          db,
+          "users",
+          user.uid,
+          "donations",
+          selectedItem.id
+        );
+        await updateDoc(itemRef, { status: actionType });
+        setDonationItems((prev) =>
+          prev.map((item) =>
+            item.id === selectedItem.id ? { ...item, status: actionType } : item
+          )
+        );
+      }
+      alert(`Item marked as ${actionType}`);
+      setShowDetails(false);
+    } catch (error) {
+      console.error("Error updating item:", error);
+      alert("Error updating item status");
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "active":
+        return "bg-green-100 text-green-800";
+      case "donated":
+        return "bg-blue-100 text-blue-800";
+      case "used":
+        return "bg-gray-100 text-gray-800";
+      case "planned":
+        return "bg-purple-100 text-purple-800";
+      case "available":
+        return "bg-orange-100 text-orange-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case "active":
+        return <Package className="h-4 w-4" />;
+      case "donated":
+        return <Gift className="h-4 w-4" />;
+      case "used":
+        return <CheckCircle className="h-4 w-4" />;
+      case "planned":
+        return <ChefHat className="h-4 w-4" />;
+      case "available":
+        return <AlertTriangle className="h-4 w-4" />;
+      default:
+        return <Package className="h-4 w-4" />;
+    }
+  };
+
+  const CustomCheckbox = ({ name, checked, onChange, label }) => (
+    <label className="flex items-center space-x-3 cursor-pointer group">
+      <div className="relative">
+        <input
+          type="checkbox"
+          name={name}
+          checked={checked}
+          onChange={onChange}
+          className="sr-only"
+        />
+        <div
+          className={`w-5 h-5 border-2 rounded transition-all duration-200 flex items-center justify-center ${
+            checked
+              ? "bg-green-500 border-green-500"
+              : "bg-white border-gray-300 group-hover:border-green-400"
+          }`}
+        >
+          {checked && <Check className="h-3 w-3 text-white" />}
+        </div>
+      </div>
+      <span
+        className={`font-medium transition-colors duration-200 ${
+          checked ? "text-green-700" : "text-gray-700"
+        }`}
+      >
+        {label}
+      </span>
+    </label>
+  );
+  
