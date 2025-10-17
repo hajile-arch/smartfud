@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { doc, updateDoc, deleteDoc } from "firebase/firestore";
-import { db } from "../firebase"; // adjust path as needed
+import { db } from "../../firebase"; // adjust path as needed
 import { X, Edit, Trash2 } from "lucide-react";
 
 const DonationItemDetails = ({ donation, onDelete, onUpdate }) => {

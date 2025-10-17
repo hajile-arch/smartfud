@@ -10,7 +10,7 @@ import {
   deleteDoc,
   getDoc
 } from "firebase/firestore";
-import { db, auth } from "./firebase";
+import { db, auth } from "../firebase";
 import {
   Check,
   MapPin,
