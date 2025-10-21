@@ -3,7 +3,8 @@ import Register from "./Register";
 import Login from "./Login";
 import Verify from "./Verify";
 import FoodInventory from "./FoodInventory";
-import PrivateRoute from "./PrivateRoute"; // import your PrivateRoute component
+import TrackAndReport from "./FoodImpactDashboard"; // 👈 ensure this matches your file/export
+import PrivateRoute from "./PrivateRoute";
 import { useState, useEffect } from "react";
 import { auth } from "../firebase";
 import BrowseFoodItems from "./BrowseFoodItem";
@@ -19,11 +20,9 @@ export default function App() {
     });
     return () => unsubscribe();
   }, []);
-  console.log("Current user:", user);
-  if (loading) {
-    return <div>Loading...</div>;
-  }
-  console.log("Current user:", user);
+
+  if (loading) return <div>Loading...</div>;
+
   return (
     <BrowserRouter>
       {/* Navbar */}
@@ -32,14 +31,26 @@ export default function App() {
           <h1 className="text-xl font-bold text-blue-600">SmartFud</h1>
 
           <div className="space-x-4">
-            <Link to="/browsefooditems" className="hover:text-blue-600">
-              Browse Food Items
-            </Link>
+            {/* Only show app pages when logged in */}
+            {user && (
+              <>
+                <Link to="/browsefooditems" className="hover:text-blue-600">
+                  Browse Food Items
+                </Link>
+                <Link to="/foodanalytics" className="hover:text-blue-600">
+                  Food Analytics
+                </Link>
+                <Link to="/foodinv" className="hover:text-blue-600">
+                  Inventory
+                </Link>
+              </>
+            )}
+
             <Link to="/" className="hover:text-blue-600">
               Home
             </Link>
 
-            {/* 👇 Conditional rendering based on login state */}
+            {/* Auth links */}
             {!user ? (
               <>
                 <Link to="/register" className="hover:text-blue-600">
@@ -61,7 +72,7 @@ export default function App() {
         </div>
       </nav>
 
-      {/* Page Routes */}
+      {/* Routes */}
       <Routes>
         <Route
           path="/"
@@ -71,39 +82,61 @@ export default function App() {
                 Hi Welcome to <span className="text-blue-600">SmartFud</span>
               </h2>
               <p className="text-gray-600 max-w-lg mb-6">
-                Track your food, plan meals, and reduce waste — all in one
-                place.
+                Track your food, plan meals, and reduce waste — all in one place.
               </p>
+
               <div className="space-x-4">
-                <Link
-                  to="/register"
-                  className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
-                >
-                  Get Started
-                </Link>
-                <Link
-                  to="/login"
-                  className="border border-blue-600 text-blue-600 px-6 py-2 rounded-lg hover:bg-blue-50 transition"
-                >
-                  Login
-                </Link>
-                <Link
-                  to="/foodinv"
-                  className="border border-blue-600 text-blue-600 px-6 py-2 rounded-lg hover:bg-blue-50 transition"
-                >
-                  Inventory
-                </Link>
+                {!user ? (
+                  <>
+                    <Link
+                      to="/register"
+                      className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
+                    >
+                      Get Started
+                    </Link>
+                    <Link
+                      to="/login"
+                      className="border border-blue-600 text-blue-600 px-6 py-2 rounded-lg hover:bg-blue-50 transition"
+                    >
+                      Login
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <Link
+                      to="/foodinv"
+                      className="border border-blue-600 text-blue-600 px-6 py-2 rounded-lg hover:bg-blue-50 transition"
+                    >
+                      Inventory
+                    </Link>
+                    <Link
+                      to="/foodanalytics"
+                      className="border border-blue-600 text-blue-600 px-6 py-2 rounded-lg hover:bg-blue-50 transition"
+                    >
+                      Food Analytics
+                    </Link>
+                    <Link
+                      to="/browsefooditems"
+                      className="border border-blue-600 text-blue-600 px-6 py-2 rounded-lg hover:bg-blue-50 transition"
+                    >
+                      Browse Food Items
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
           }
         />
+
         <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
         <Route path="/verify" element={<Verify />} />
+
+        {/* Protected routes (pass user + loading into PrivateRoute) */}
         <Route
           path="/foodinv"
           element={
-            <PrivateRoute user={user}>
+            <PrivateRoute user={user} loading={loading}>
               <FoodInventory />
             </PrivateRoute>
           }
@@ -111,8 +144,16 @@ export default function App() {
         <Route
           path="/browsefooditems"
           element={
-            <PrivateRoute user={user}>
+            <PrivateRoute user={user} loading={loading}>
               <BrowseFoodItems />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/foodanalytics"
+          element={
+            <PrivateRoute user={user} loading={loading}>
+              <TrackAndReport user={user} />
             </PrivateRoute>
           }
         />
