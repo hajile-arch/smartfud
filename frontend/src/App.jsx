@@ -5,7 +5,7 @@ import Verify from "./Verify";
 import FoodInventory from "./FoodInventory";
 import PrivateRoute from "./PrivateRoute"; // import your PrivateRoute component
 import { useState, useEffect } from "react";
-import {auth} from "../firebase"
+import { auth } from "../firebase";
 import BrowseFoodItems from "./BrowseFoodItem";
 
 export default function App() {
@@ -18,24 +18,45 @@ export default function App() {
       setLoading(false);
     });
     return () => unsubscribe();
-    
   }, []);
-console.log("Current user:", user);
+  console.log("Current user:", user);
   if (loading) {
     return <div>Loading...</div>;
   }
-console.log("Current user:", user);
+  console.log("Current user:", user);
   return (
     <BrowserRouter>
       {/* Navbar */}
       <nav className="bg-white shadow-md">
         <div className="max-w-6xl mx-auto px-6 py-3 flex justify-between items-center">
           <h1 className="text-xl font-bold text-blue-600">SmartFud</h1>
+
           <div className="space-x-4">
-            <Link to="/browsefooditems" className="hover:text-blue-600">Browse Food Items </Link>
-            <Link to="/" className="hover:text-blue-600">Home</Link>
-            <Link to="/register" className="hover:text-blue-600">Register</Link>
-            <Link to="/login" className="hover:text-blue-600">Login</Link>
+            <Link to="/browsefooditems" className="hover:text-blue-600">
+              Browse Food Items
+            </Link>
+            <Link to="/" className="hover:text-blue-600">
+              Home
+            </Link>
+
+            {/* 👇 Conditional rendering based on login state */}
+            {!user ? (
+              <>
+                <Link to="/register" className="hover:text-blue-600">
+                  Register
+                </Link>
+                <Link to="/login" className="hover:text-blue-600">
+                  Login
+                </Link>
+              </>
+            ) : (
+              <button
+                onClick={() => auth.signOut()}
+                className="hover:text-red-600 transition"
+              >
+                Logout
+              </button>
+            )}
           </div>
         </div>
       </nav>
@@ -50,7 +71,8 @@ console.log("Current user:", user);
                 Hi Welcome to <span className="text-blue-600">SmartFud</span>
               </h2>
               <p className="text-gray-600 max-w-lg mb-6">
-                Track your food, plan meals, and reduce waste — all in one place.
+                Track your food, plan meals, and reduce waste — all in one
+                place.
               </p>
               <div className="space-x-4">
                 <Link
