@@ -335,7 +335,8 @@ const FoodInventory = () => {
       matchesSearch &&
       matchesCategory &&
       matchesExpiry &&
-      (item.status === "active" || item.status === "donated")
+      (item.status === "active" || item.status === "donated" ||
+      item.status === "planned")
     );
   });
 
@@ -387,7 +388,7 @@ const FoodInventory = () => {
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Total Items</p>
               <p className="text-2xl font-bold text-gray-900">
-                {items.filter((i) => i.status === "active").length}
+                {items.filter((i) => i.status === "active" || i.status === "planned").length}
               </p>
             </div>
           </div>
