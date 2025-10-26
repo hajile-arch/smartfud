@@ -596,7 +596,7 @@ const { start, end, label } = useMemo(() => {
           <p className="text-gray-600 mt-2">
             Start logging items and marking them as <strong>used</strong> or
             converting to
-            <strong> donations</strong> to see your impact here.
+            <strong> donations</strong> to see your impact here as a good user.
           </p>
         </div>
       )}
