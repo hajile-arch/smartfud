@@ -11,9 +11,15 @@ export default function IngredientPickerModal({
   const [search, setSearch] = useState("");
   const [rows, setRows] = useState([]); // [{itemId,name,quantity}]
 
+  // Helper for showing toast messages
+  const showToast = (message, type) => {
+    // Implement your toast logic here
+    alert(message); // simple fallback
+  };
+
   useEffect(() => {
     if (open) {
-      setRows(initial.map(x => ({ ...x })));
+      setRows(initial.map((x) => ({ ...x })));
       setSearch("");
     }
   }, [open, initial]);
@@ -22,25 +28,33 @@ export default function IngredientPickerModal({
     const q = search.trim().toLowerCase();
     if (!q) return inventory;
     return inventory.filter(
-      it =>
+      (it) =>
         it.name?.toLowerCase().includes(q) ||
         it.category?.toLowerCase().includes(q)
     );
   }, [inventory, search]);
 
-  const getQty = (id) => rows.find(r => r.itemId === id)?.quantity || 0;
-  const setQty = (item, qty) => {
+  const getQty = (id) => rows.find((r) => r.itemId === id)?.quantity || 0;
+
+  // Updated setQty with validation
+  const setQty = (item, qty, max = null) => {
     qty = Math.max(0, Math.floor(qty) || 0);
-    setRows(prev => {
-      const exists = prev.find(x => x.itemId === item.id);
+    if (max !== null && qty > max) {
+      showToast(`Cannot select more than ${max} of ${item.name}`, 'error');
+      qty = max; // cap at max
+    }
+    setRows((prev) => {
+      const exists = prev.find((x) => x.itemId === item.id);
       if (!exists && qty > 0) {
         return [...prev, { itemId: item.id, name: item.name, quantity: qty }];
       }
       if (exists && qty === 0) {
-        return prev.filter(x => x.itemId !== item.id);
+        return prev.filter((x) => x.itemId !== item.id);
       }
       if (exists) {
-        return prev.map(x => x.itemId === item.id ? { ...x, quantity: qty } : x);
+        return prev.map((x) =>
+          x.itemId === item.id ? { ...x, quantity: qty } : x
+        );
       }
       return prev;
     });
@@ -69,32 +83,47 @@ export default function IngredientPickerModal({
               <div className="py-6 text-center text-gray-500 text-sm">No items</div>
             )}
             {filtered.map((it) => {
-              const available = Math.max(0, Number(it.quantity) - Number(it.reserved || 0));
+              const available = Math.max(
+                0,
+                Number(it.quantity) - Number(it.reserved || 0)
+              );
+              const currentQty = getQty(it.id);
               return (
                 <div key={it.id} className="py-3 flex items-center justify-between">
                   <div className="min-w-0">
                     <div className="font-medium truncate">{it.name}</div>
                     <div className="text-xs text-gray-500">
                       {it.category} • {available}/{it.quantity} available
-                      {it.expiry && <> • Exp: {new Date(it.expiry).toLocaleDateString()}</>}
+                      {it.expiry && (
+                        <> • Exp: {new Date(it.expiry).toLocaleDateString()}</>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <button
                       className="px-2 py-1 border rounded"
-                      onClick={() => setQty(it, getQty(it.id) - 1)}
-                    >-</button>
+                      onClick={() => setQty(it, currentQty - 1)}
+                    >
+                      -
+                    </button>
                     <input
                       type="number"
                       className="w-16 border rounded px-2 py-1 text-center"
-                      value={getQty(it.id)}
-                      onChange={(e) => setQty(it, Number(e.target.value))}
+                      value={currentQty}
+                      onChange={(e) => {
+                        const newQty = Number(e.target.value);
+                        if (!isNaN(newQty)) {
+                          setQty(it, newQty, available);
+                        }
+                      }}
                       min={0}
                     />
                     <button
                       className="px-2 py-1 border rounded"
-                      onClick={() => setQty(it, getQty(it.id) + 1)}
-                    >+</button>
+                      onClick={() => setQty(it, currentQty + 1, available)}
+                    >
+                      +
+                    </button>
                   </div>
                 </div>
               );
@@ -103,10 +132,12 @@ export default function IngredientPickerModal({
         </div>
 
         <div className="p-4 border-t flex items-center justify-end gap-2">
-          <button className="px-3 py-2 border rounded-md" onClick={onClose}>Cancel</button>
+          <button className="px-3 py-2 border rounded-md" onClick={onClose}>
+            Cancel
+          </button>
           <button
             className="px-4 py-2 rounded-md bg-green-600 text-white hover:bg-green-700"
-            onClick={() => onSave(rows.filter(r => r.quantity > 0))}
+            onClick={() => onSave(rows.filter((r) => r.quantity > 0))}
           >
             Save
           </button>
