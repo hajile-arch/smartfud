@@ -6,6 +6,7 @@ import FoodInventory from "./FoodInventory";
 import TrackAndReport from "./FoodImpactDashboard"; // 👈 ensure this matches your file/export
 import PrivateRoute from "./PrivateRoute";
 import { useState, useEffect } from "react";
+import MealPlanner from "./MealPlanner";
 import { auth } from "../firebase";
 import BrowseFoodItems from "./BrowseFoodItem";
 
@@ -37,6 +38,7 @@ export default function App() {
                 <Link to="/browsefooditems" className="hover:text-blue-600">
                   Browse Food Items
                 </Link>
+                
                 <Link to="/foodanalytics" className="hover:text-blue-600">
                   Food Analytics
                 </Link>
@@ -74,6 +76,7 @@ export default function App() {
 
       {/* Routes */}
       <Routes>
+        
         <Route
           path="/"
           element={
@@ -116,10 +119,10 @@ export default function App() {
                       Food Analytics
                     </Link>
                     <Link
-                      to="/browsefooditems"
+                     to="/meal-planner"
                       className="border border-blue-600 text-blue-600 px-6 py-2 rounded-lg hover:bg-blue-50 transition"
                     >
-                      Browse Food Items
+                      Meal Plans
                     </Link>
                   </>
                 )}
@@ -127,7 +130,14 @@ export default function App() {
             </div>
           }
         />
-
+<Route
+  path="/meal-planner"
+  element={
+    <PrivateRoute user={user}>
+      <MealPlanner user={user} />
+    </PrivateRoute>
+  }
+/>
         <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
         <Route path="/verify" element={<Verify />} />
