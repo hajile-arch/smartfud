@@ -52,6 +52,8 @@ function weekKeyOf(date) {
 }
 
 export default function MealPlanner({ user }) {
+ const [notification, setNotification] = useState(null);
+  const [showNotification, setShowNotification] = useState(false);
   const [anchorDate, setAnchorDate] = useState(startOfWeek(new Date()));
   const [inventory, setInventory] = useState([]);
   const [plan, setPlan] = useState({}); // key -> { title, note, ingredients[] }
@@ -114,6 +116,24 @@ export default function MealPlanner({ user }) {
       notes: "Fresh vegetable salad.",
     },
   ];
+
+    // Function to show a notification
+  const showToast = (message, type = 'error') => {
+    setNotification({ message, type });
+    setShowNotification(true);
+
+    // Start fade-out after 3 seconds
+    setTimeout(() => {
+      setShowNotification(false);
+    }, 3000);
+  };
+
+  // Optional: handle transition end to clear notification
+  const handleTransitionEnd = () => {
+    if (!showNotification) {
+      setNotification(null);
+    }
+  };
 
   // Inventory fetching
   useEffect(() => {
@@ -282,6 +302,41 @@ export default function MealPlanner({ user }) {
 
   // Add recipe to plan
   const handleAddRecipe = (recipe) => {
+    const missingIngredients = [];
+showToast('Missing ingredients!', 'error');
+    recipe.ingredients.forEach((ing) => {
+      const inventoryItem = inventory.find(
+        (item) => item.name.toLowerCase() === ing.name.toLowerCase()
+      );
+      if (!inventoryItem || inventoryItem.quantity < ing.quantity) {
+        missingIngredients.push({
+          name: ing.name,
+          required: ing.quantity,
+          available: inventoryItem?.quantity || 0,
+        });
+      }
+    });
+
+    if (missingIngredients.length > 0) {
+      setNotification({
+        type: "error",
+        message: (
+          <div>
+            <p className="font-semibold mb-2">Missing ingredients:</p>
+            <ul className="list-inside list-disc text-sm">
+              {missingIngredients.map((ing, index) => (
+                <li key={index}>
+                  {ing.name}: need {ing.required}, available {ing.available}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ),
+      });
+      return;
+    }
+
+    // Proceed with adding
     setTempRecipe(recipe);
     setShowDateMealModal(true);
   };
@@ -344,6 +399,24 @@ export default function MealPlanner({ user }) {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+      {notification && (
+        <div
+          className={`fixed top-4 right-4 max-w-sm w-full p-4 rounded-lg shadow-lg z-50 transition-opacity duration-500 ${
+            showNotification ? 'opacity-100' : 'opacity-0'
+          } ${notification.type === 'error' ? 'bg-red-500 text-white' : ''}`}
+          onTransitionEnd={handleTransitionEnd}
+        >
+          <div className="flex items-start space-x-2">
+            <div className="flex-1">{notification.message}</div>
+            <button
+              onClick={() => setShowNotification(false)}
+              className="ml-2 text-xl font-bold focus:outline-none"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
