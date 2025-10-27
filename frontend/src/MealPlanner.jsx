@@ -71,6 +71,8 @@ export default function MealPlanner({ user }) {
   const [pendingMeal, setPendingMeal] = useState(null);
   const [showDateMealModal, setShowDateMealModal] = useState(false);
   const [tempRecipe, setTempRecipe] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(ymd(new Date())); // default today
+  const [selectedMeal, setSelectedMeal] = useState("breakfast");
 
   // Basic recipes list
   const basicRecipes = [
@@ -302,44 +304,48 @@ export default function MealPlanner({ user }) {
 
   // Add recipe to plan
   const handleAddRecipe = (recipe) => {
-    const missingIngredients = [];
-showToast('Missing ingredients!', 'error');
-    recipe.ingredients.forEach((ing) => {
-      const inventoryItem = inventory.find(
-        (item) => item.name.toLowerCase() === ing.name.toLowerCase()
-      );
-      if (!inventoryItem || inventoryItem.quantity < ing.quantity) {
-        missingIngredients.push({
-          name: ing.name,
-          required: ing.quantity,
-          available: inventoryItem?.quantity || 0,
-        });
-      }
-    });
+  const missingIngredients = [];
 
-    if (missingIngredients.length > 0) {
-      setNotification({
-        type: "error",
-        message: (
-          <div>
-            <p className="font-semibold mb-2">Missing ingredients:</p>
-            <ul className="list-inside list-disc text-sm">
-              {missingIngredients.map((ing, index) => (
-                <li key={index}>
-                  {ing.name}: need {ing.required}, available {ing.available}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ),
+  recipe.ingredients.forEach((ing) => {
+    const inventoryItem = inventory.find(
+      (item) => item.name.toLowerCase() === ing.name.toLowerCase()
+    );
+    if (!inventoryItem || inventoryItem.quantity < ing.quantity) {
+      missingIngredients.push({
+        name: ing.name,
+        required: ing.quantity,
+        available: inventoryItem?.quantity || 0,
       });
-      return;
     }
+  });
 
-    // Proceed with adding
-    setTempRecipe(recipe);
-    setShowDateMealModal(true);
-  };
+  if (missingIngredients.length > 0) {
+    // Show a quick toast
+    showToast('Missing ingredients for this recipe.', 'error');
+
+    // Also show detailed missing ingredients in notification
+    setNotification({
+      type: "error",
+      message: (
+        <div>
+          <p className="font-semibold mb-2">Missing ingredients:</p>
+          <ul className="list-inside list-disc text-sm">
+            {missingIngredients.map((ing, index) => (
+              <li key={index}>
+                {ing.name}: need {ing.required}, available {ing.available}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ),
+    });
+    return;
+  }
+
+  // If all ingredients are available, proceed
+  setTempRecipe(recipe);
+  setShowDateMealModal(true);
+};
   const handleConfirmDateMeal = (date, meal) => {
     if (tempRecipe) {
       const key = `${date}:${meal}`;
