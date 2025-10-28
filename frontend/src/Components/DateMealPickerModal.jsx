@@ -2,7 +2,9 @@
 import { useEffect, useRef, useState } from "react";
 
 export default function DateMealPickerModal({ open, onClose, onConfirm }) {
-  const [date, setDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [date, setDate] = useState(
+    () => new Date().toISOString().split("T")[0]
+  );
   const [meal, setMeal] = useState("breakfast");
   const dialogRef = useRef(null);
   const firstFieldRef = useRef(null);
@@ -34,6 +36,20 @@ export default function DateMealPickerModal({ open, onClose, onConfirm }) {
     { key: "snack", label: "Snack" },
   ];
 
+  // Determine if selected date is today
+  const currentDayIsToday = date === todayStr;
+
+  // Get current hour for disabling meal options if today
+  const now = new Date();
+  const currentHour = now.getHours();
+
+  const isPastMealTime = {
+    breakfast: currentHour >= 10, // e.g., disable breakfast after 10 AM
+    lunch: currentHour >= 14, // disable lunch after 2 PM
+    dinner: currentHour >= 18, // disable dinner after 6 PM
+    snack: false, // snacks anytime
+  };
+
   const handleConfirm = () => {
     if (!date) return;
     onConfirm?.(date, meal);
@@ -43,7 +59,21 @@ export default function DateMealPickerModal({ open, onClose, onConfirm }) {
     // close when clicking outside content
     if (e.target === e.currentTarget) onClose?.();
   };
+  // Inside your component
 
+  const handleDateChange = (e) => {
+    const selectedDate = e.target.value;
+    if (selectedDate < todayStr) {
+      setDate(todayStr); // Reset to today if past date selected
+    } else {
+      setDate(selectedDate);
+    }
+  };
+
+  // For the Confirm button disable logic
+  const isDateValid = () => {
+    return date >= todayStr;
+  };
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center px-4"
@@ -93,7 +123,7 @@ export default function DateMealPickerModal({ open, onClose, onConfirm }) {
                 type="date"
                 value={date}
                 min={todayStr}
-                onChange={(e) => setDate(e.target.value)}
+                onChange={handleDateChange}
                 className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <button
@@ -115,16 +145,20 @@ export default function DateMealPickerModal({ open, onClose, onConfirm }) {
             <div className="grid grid-cols-4 gap-2">
               {MEALS.map((m) => {
                 const active = meal === m.key;
+                // Disable if it's today and the current time has passed meal time
+                const disabled = currentDayIsToday && isPastMealTime[m.key];
                 return (
                   <button
                     key={m.key}
                     type="button"
-                    onClick={() => setMeal(m.key)}
+                    onClick={() => !disabled && setMeal(m.key)}
+                    disabled={disabled}
                     className={[
                       "rounded-md px-3 py-2 text-sm font-medium transition",
                       active
                         ? "bg-blue-600 text-white shadow-sm"
                         : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50",
+                      disabled ? "opacity-50 cursor-not-allowed" : "",
                     ].join(" ")}
                     aria-pressed={active}
                   >
@@ -147,7 +181,7 @@ export default function DateMealPickerModal({ open, onClose, onConfirm }) {
           <button
             className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
             onClick={handleConfirm}
-            disabled={!date}
+            disabled={!isDateValid()}
           >
             Confirm
           </button>
