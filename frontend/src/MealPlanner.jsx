@@ -53,6 +53,7 @@ function weekKeyOf(date) {
 }
 
 export default function MealPlanner({ user }) {
+  const todayStr = new Date().toISOString().split('T')[0];
  const [notification, setNotification] = useState(null);
   const [showNotification, setShowNotification] = useState(false);
   const [anchorDate, setAnchorDate] = useState(startOfWeek(new Date()));
@@ -607,15 +608,16 @@ const expiryTone = (d) => {
 
       {/* Weekly Meal Plan Grid */}
       <WeeklyMealPlanGrid
-        plan={plan}
-        weekDays={weekDays}
-        ymd={ymd}
-        SLOT_KEYS={SLOT_KEYS}
-        setTitle={setTitle}
-        openAdd={openAdd}
-        setNote={setNote}
-        clearSlot={clearSlot}
-      />
+      plan={plan}
+      weekDays={weekDays}
+      ymd={ymd}
+      SLOT_KEYS={SLOT_KEYS}
+      setTitle={setTitle}
+      openAdd={openAdd}
+      setNote={setNote}
+      clearSlot={clearSlot}
+      currentDateStr={todayStr}
+    />
 
       {/* Ingredient Picker Modal */}
       <IngredientPickerModal
