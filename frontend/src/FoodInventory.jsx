@@ -1,6 +1,5 @@
-// ---------------- Imports ----------------
 import React, { useState, useEffect } from "react";
-import { auth, db } from "./firebase"; // Firebase authentication & Firestore DB
+import { auth, db } from "../firebase";
 import {
   collection,
   addDoc,
@@ -12,10 +11,9 @@ import {
   deleteDoc,
   orderBy,
 } from "firebase/firestore";
-import ConvertDonationModal from "./Components/ConvertDonationModal"; // Modal for converting inventory to donation
-import DonationItemDetails from "./Components/DonationItemDetails"; // UI component for each donation item
-import { onAuthStateChanged } from "firebase/auth"; // Track user authentication state
-// UI icons from lucide-react
+import ConvertDonationModal from "./Components/ConvertDonationModal";
+import DonationItemDetails from "./Components/DonationItemDetails";
+import { onAuthStateChanged } from "firebase/auth";
 import {
   Plus,
   Edit,
@@ -31,9 +29,11 @@ import {
   AlertTriangle,
   X,
 } from "lucide-react";
+import { initialFormData, categories } from './Config/constants';
+import FoodInventoryHeader from "./Components/FoodInventoryHeader";
+import FoodInventoryForm from "./Components/FoodInventoryForm";
 
 const FoodInventory = () => {
-  const [foodItems, setFoodItems] = useState([]);
   const [showConvertModal, setShowConvertModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [pickupLocation, setPickupLocation] = useState("");
@@ -47,7 +47,7 @@ const FoodInventory = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [expiryFilter, setExpiryFilter] = useState("all");
-
+const [formData, setFormData] = useState(initialFormData);
   const handleOpenConvertModal = (item) => {
     setSelectedItem(item);
     setPickupLocation("");
@@ -55,6 +55,7 @@ const FoodInventory = () => {
     setShowConvertModal(true);
   };
 
+  // Handler for modal confirmation
   const handleConfirmConversion = async () => {
     if (!pickupLocation || !availability) {
       alert("Please fill in all fields");
@@ -63,25 +64,29 @@ const FoodInventory = () => {
     try {
       const donationData = {
         ...selectedItem,
-        status: "available",
+        // originalItemId: selectedItem.id,
+        status: "donated",
         pickupLocation,
         availability,
         contactInfo: user.email,
         createdAt: new Date(),
       };
 
+      // Save donation
       await addDoc(
         collection(db, "users", user.uid, "donations"),
         donationData
       );
 
+      // Update inventory item
       await updateDoc(
         doc(db, "users", user.uid, "inventory", selectedItem.id),
         { status: "donated", donatedAt: new Date() }
       );
-
+      // Remove from Firestore
       await deleteDoc(doc(db, "users", user.uid, "inventory", selectedItem.id));
 
+      // Remove from local state
       setItems((prevItems) =>
         prevItems.filter((item) => item.id !== selectedItem.id)
       );
@@ -89,32 +94,11 @@ const FoodInventory = () => {
       setShowConvertModal(false);
       setSelectedItem(null);
     } catch (error) {
-      console.error("Error converting item:", error);
+      console.error("   Error converting item:", error);
       alert("Error converting item. Please try again.");
     }
   };
-
-  const [formData, setFormData] = useState({
-    name: "",
-    quantity: "",
-    expiry: "",
-    category: "",
-    location: "",
-    notes: "",
-  });
-
-  const categories = [
-    "Fruits & Vegetables",
-    "Dairy & Eggs",
-    "Meat & Poultry",
-    "Grains & Bread",
-    "Canned Goods",
-    "Frozen Foods",
-    "Beverages",
-    "Snacks",
-    "Other",
-  ];
-
+  // Check authentication
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
@@ -127,7 +111,9 @@ const FoodInventory = () => {
     return () => unsubscribe();
   }, []);
 
+  // Load user's inventory and donations
   const loadUserData = (userId) => {
+    // Inventory listener
     const inventoryQuery = query(
       collection(db, "users", userId, "inventory"),
       orderBy("expiry", "asc")
@@ -142,6 +128,7 @@ const FoodInventory = () => {
       setItems(inventoryItems);
     });
 
+    // Donations listener
     const donationsQuery = query(
       collection(db, "users", userId, "donations"),
       orderBy("createdAt", "desc")
@@ -169,61 +156,53 @@ const FoodInventory = () => {
     };
   };
 
-   const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
+  // Handle form input changes
+  // const handleInputChange = (e) => {
+  //   const { name, value } = e.target;
+  //   setFormData((prev) => ({
+  //     ...prev,
+  //     [name]: value,
+  //   }));
+  // };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (
-      !formData.name ||
-      !formData.quantity ||
-      !formData.expiry ||
-      !formData.category
-    ) {
-      alert("Please complete all required fields");
-      return;
+  // Add or update item
+  const handleSubmit = async (formData, editingItem) => {
+  // Validation
+  if (!formData.name || !formData.quantity || !formData.expiry || !formData.category) {
+    alert("Please complete all required fields");
+    return;
+  }
+
+  try {
+    const itemData = {
+      ...formData,
+      quantity: parseInt(formData.quantity),
+      expiry: new Date(formData.expiry),
+      createdAt: new Date(),
+      status: "active",
+      userId: user.uid,
+    };
+
+    if (editingItem) {
+      // Update existing item
+      await updateDoc(
+        doc(db, "users", user.uid, "inventory", editingItem.id),
+        itemData
+      );
+    } else {
+      // Add new item
+      await addDoc(collection(db, "users", user.uid, "inventory"), itemData);
     }
 
-    try {
-      const itemData = {
-        ...formData,
-        quantity: parseInt(formData.quantity),
-        expiry: new Date(formData.expiry),
-        createdAt: new Date(),
-        status: "active",
-        userId: user.uid,
-      };
-
-      if (editingItem) {
-        await updateDoc(
-          doc(db, "users", user.uid, "inventory", editingItem.id),
-          itemData
-        );
-      } else {
-        await addDoc(collection(db, "users", user.uid, "inventory"), itemData);
-      }
-
-      setFormData({
-        name: "",
-        quantity: "",
-        expiry: "",
-        category: "",
-        location: "",
-        notes: "",
-      });
-      setEditingItem(null);
-      setShowForm(false);
-    } catch (error) {
-      console.error("Error saving item:", error);
-      alert("Error saving item. Please try again.");
-    }
-  };
-
+    // Reset form and close modal
+    setShowForm(false);
+    setEditingItem(null);
+  } catch (error) {
+    console.error("Error saving item:", error);
+    alert("Error saving item. Please try again.");
+  }
+};
+  // Edit item
   const handleEdit = (item) => {
     setEditingItem(item);
     setFormData({
@@ -237,6 +216,7 @@ const FoodInventory = () => {
     setShowForm(true);
   };
 
+  // Delete item
   const handleDelete = async (itemId) => {
     if (window.confirm("Are you sure you want to delete this item?")) {
       try {
@@ -248,6 +228,7 @@ const FoodInventory = () => {
     }
   };
 
+  // Check if item is expiring soon (within 3 days)
   const isExpiringSoon = (expiryDate) => {
     const today = new Date();
     const threeDaysFromNow = new Date(today);
@@ -255,10 +236,12 @@ const FoodInventory = () => {
     return expiryDate <= threeDaysFromNow && expiryDate >= today;
   };
 
+  // Check if item is expired
   const isExpired = (expiryDate) => {
     return expiryDate < new Date();
   };
 
+  // Filter items based on search and filters
   const filteredItems = items.filter((item) => {
     const matchesSearch = item.name
       .toLowerCase()
@@ -275,15 +258,17 @@ const FoodInventory = () => {
       matchesExpiry = !isExpiringSoon(item.expiry) && !isExpired(item.expiry);
     }
 
+    // Remove or modify the status check to include other statuses
+    // For example, include 'active' and 'donated'
     return (
       matchesSearch &&
       matchesCategory &&
       matchesExpiry &&
-      (item.status === "active" || item.status === "donated")
+      (item.status === "active" || item.status === "donated" ||
+      item.status === "planned")
     );
   });
 
-  // git commit: ui: add loading and unauthenticated user messages
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -305,255 +290,244 @@ const FoodInventory = () => {
     );
   }
 
-  // ... rest of UI code for inventory list, donation list, modals ...
-};
-
-const isExpiringSoon = (expiryDate) => {
-    const today = new Date();
-    const threeDaysFromNow = new Date(today);
-    threeDaysFromNow.setDate(today.getDate() + 3);
-    return expiryDate <= threeDaysFromNow && expiryDate >= today;
-  };
-
-  const isExpired = (expiryDate) => {
-    return expiryDate < new Date();
-  };
-
-  const filteredItems = items.filter((item) => {
-    const matchesSearch = item.name
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase());
-    const matchesCategory =
-      categoryFilter === "all" || item.category === categoryFilter;
-
-    let matchesExpiry = true;
-    if (expiryFilter === "expiring") {
-      matchesExpiry = isExpiringSoon(item.expiry);
-    } else if (expiryFilter === "expired") {
-      matchesExpiry = isExpired(item.expiry);
-    } else if (expiryFilter === "safe") {
-      matchesExpiry = !isExpiringSoon(item.expiry) && !isExpired(item.expiry);
-    }
-
-    return (
-      matchesSearch &&
-      matchesCategory &&
-      matchesExpiry &&
-      (item.status === "active" || item.status === "donated")
-    );
-  });
-
-
-if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500"></div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="text-center py-12">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">
-          Please log in to manage your inventory
-        </h2>
-        <p className="text-gray-600">
-          You need to be authenticated to access the food inventory.
-        </p>
-      </div>
-    );
-  }
-
-  // ... rest of UI code for inventory list, donation list, modals ...
-//};
-return (
-  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <div className="flex justify-between items-center mb-8">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Food Inventory</h1>
-        <p className="text-gray-600 mt-2">
-          Manage your food items and reduce waste
-        </p>
-      </div>
-      <button
-        onClick={() => setShowForm(true)}
-        className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 flex items-center"
-      >
-        <Plus className="h-5 w-5 mr-2" />
-        Add Food Item
-      </button>
-    </div>
-
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <div className="flex items-center">
-          <Package className="h-8 w-8 text-blue-500" />
-          <div className="ml-4">
-            <p className="text-sm font-medium text-gray-600">Total Items</p>
-            <p className="text-2xl font-bold text-gray-900">
-              {items.filter((i) => i.status === "active").length}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <div className="flex items-center">
-          <AlertTriangle className="h-8 w-8 text-red-500" />
-          <div className="ml-4">
-            <p className="text-sm font-medium text-gray-600">Expiring Soon</p>
-            <p className="text-2xl font-bold text-red-600">
-              {items.filter(
-                (item) =>
-                  isExpiringSoon(item.expiry) && item.status === "active"
-              ).length}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <div className="flex items-center">
-          <Clock className="h-8 w-8 text-orange-500" />
-          <div className="ml-4">
-            <p className="text-sm font-medium text-gray-600">Expired</p>
-            <p className="text-2xl font-bold text-orange-600">
-              {items.filter(
-                (item) => isExpired(item.expiry) && item.status === "active"
-              ).length}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <div className="flex items-center">
-          <Gift className="h-8 w-8 text-green-500" />
-          <div className="ml-4">
-            <p className="text-sm font-medium text-gray-600">Donations</p>
-            <p className="text-2xl font-bold text-green-600">{donations.length}</p>
-          </div>
-        </div>
-      </div>
-    </div>
-
-<div className="bg-white p-6 rounded-lg shadow-md mb-6">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search items..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-          />
-        </div>
-
-        <select
-          value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
-          className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-        >
-          <option value="all">All Categories</option>
-          {categories.map((cat) => (
-            <option key={cat} value={cat}>
-              {cat}
-            </option>
-          ))}
-        </select>
-
-        <select
-          value={expiryFilter}
-          onChange={(e) => setExpiryFilter(e.target.value)}
-          className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-        >
-          <option value="all">All Items</option>
-          <option value="safe">Safe</option>
-          <option value="expiring">Expiring Soon</option>
-          <option value="expired">Expired</option>
-        </select>
-
-        <button
-          onClick={() => {
-            setSearchTerm("");
-            setCategoryFilter("all");
-            setExpiryFilter("all");
-          }}
-          className="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300"
-        >
-          Clear Filters
-        </button>
-      </div>
-    </div>
-
-    {showForm && (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-lg max-w-md w-full p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold">
-              {editingItem ? "Edit Food Item" : "Add Food Item"}
-            </h3>
-            <button
-              onClick={() => {
-                setShowForm(false);
-                setEditingItem(null);
-              }}
-              className="text-gray-400 hover:text-gray-600"
-            >
-              <X className="h-5 w-5" />
-            </button>
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <FoodInventoryHeader 
+        items={items}
+        donations={donations}
+        onAddItem={() => setShowForm(true)}
+      />
+      {/* Filters and Search */}
+      <div className="bg-white p-6 rounded-lg shadow-md mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search items..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
           </div>
 
-          {/* Form fields */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Item Name, Quantity, Expiry, Category, Location, Notes */}
-            {/* ... form inputs code ... */}
-          </form>
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+          >
+            <option value="all">All Categories</option>
+            {categories.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={expiryFilter}
+            onChange={(e) => setExpiryFilter(e.target.value)}
+            className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+          >
+            <option value="all">All Items</option>
+            <option value="safe">Safe</option>
+            <option value="expiring">Expiring Soon</option>
+            <option value="expired">Expired</option>
+          </select>
+
+          <button
+            onClick={() => {
+              setSearchTerm("");
+              setCategoryFilter("all");
+              setExpiryFilter("all");
+            }}
+            className="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300"
+          >
+            Clear Filters
+          </button>
         </div>
       </div>
-    )}
-{donations.length > 0 && (
-      <div className="mt-8 bg-white rounded-lg shadow-md">
+
+      {/* Add/Edit Form Modal */}
+      <FoodInventoryForm
+  showForm={showForm}
+  editingItem={editingItem}
+  onClose={() => {
+    setShowForm(false);
+    setEditingItem(null);
+  }}
+  onSubmit={handleSubmit}
+  formData={formData}
+  onInputChange={setFormData}
+/>
+
+      {/* Inventory List */}
+      <div className="bg-white rounded-lg shadow-md">
         <div className="px-6 py-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">
-            Donation Listings ({donations.length})
+            Food Items ({filteredItems.length})
           </h2>
         </div>
 
-        <div className="divide-y divide-gray-200">
-          {donations.map((donation) => (
-            <DonationItemDetails
-              key={donation.docId}
-              donation={donation}
-              onDelete={(id) => {
-                setDonations((prev) => prev.filter((d) => d.docId !== id));
-              }}
-              onUpdate={(id, updatedData) => {
-                setDonations((prev) =>
-                  prev.map((d) =>
-                    d.docId === id ? { ...d, ...updatedData } : d
-                  )
-                );
-              }}
-            />
-          ))}
-        </div>
-      </div>
-    )}
+        {filteredItems.length === 0 ? (
+          <div className="text-center py-12">
+            <Package className="mx-auto h-12 w-12 text-gray-400" />
+            <h3 className="mt-2 text-sm font-medium text-gray-900">
+              No food items
+            </h3>
+            <p className="mt-1 text-sm text-gray-500">
+              {searchTerm || categoryFilter !== "all" || expiryFilter !== "all"
+                ? "No items match your filters."
+                : "Get started by adding your first food item."}
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-200">
+            {filteredItems.map((item) => (
+              <div key={item.id} className="px-6 py-4 hover:bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div
+                      className={`p-2 rounded-lg ${
+                        isExpired(item.expiry)
+                          ? "bg-red-100"
+                          : isExpiringSoon(item.expiry)
+                          ? "bg-orange-100"
+                          : "bg-green-100"
+                      }`}
+                    >
+                      <Utensils
+                        className={`h-5 w-5 ${
+                          isExpired(item.expiry)
+                            ? "text-red-600"
+                            : isExpiringSoon(item.expiry)
+                            ? "text-orange-600"
+                            : "text-green-600"
+                        }`}
+                      />
+                    </div>
 
-    {/* git commit: feat: integrate ConvertDonationModal for converting inventory items to donations */}
-    <ConvertDonationModal
-      isOpen={showConvertModal}
-      onClose={() => setShowConvertModal(false)}
-      onConfirm={handleConfirmConversion}
-      pickupLocation={pickupLocation}
-      setPickupLocation={setPickupLocation}
-      availability={availability}
-      setAvailability={setAvailability}
-    />
-  </div>
-);
+                    <div>
+                      <h3 className="text-lg font-medium text-gray-900">
+                        {item.name}
+                      </h3>
+                      <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
+                        <span className="flex items-center">
+                          <Package className="h-4 w-4 mr-1" />
+                          {item.quantity} units
+                        </span>
+                        <span className="flex items-center">
+                          <Calendar className="h-4 w-4 mr-1" />
+                          {item.expiry.toLocaleDateString()}
+                        </span>
+                        <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
+                          {item.category}
+                        </span>
+                        {item.location && (
+                          <span className="flex items-center">
+                            <MapPin className="h-4 w-4 mr-1" />
+                            {item.location}
+                          </span>
+                        )}
+                      </div>
+                      {item.notes && (
+                        <p className="text-sm text-gray-600 mt-1">
+                          {item.notes}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    {!isExpired(item.expiry) && (
+                      <button
+                        onClick={() => handleOpenConvertModal(item)}
+                        className="bg-green-500 text-white p-2 rounded-md hover:bg-green-600"
+                        title="Convert to Donation"
+                      >
+                        <Gift className="h-4 w-4" />
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => handleEdit(item)}
+                      className="bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600"
+                      title="Edit Item"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </button>
+
+                    <button
+                      onClick={() => handleDelete(item.id)}
+                      className="bg-red-500 text-white p-2 rounded-md hover:bg-red-600"
+                      title="Delete Item"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Expiry Warning */}
+                {isExpired(item.expiry) && (
+                  <div className="mt-2 flex items-center text-red-600 text-sm">
+                    <AlertTriangle className="h-4 w-4 mr-1" />
+                    This item has expired. Please dispose of it safely.
+                  </div>
+                )}
+
+                {isExpiringSoon(item.expiry) && !isExpired(item.expiry) && (
+                  <div className="mt-2 flex items-center text-orange-600 text-sm">
+                    <Clock className="h-4 w-4 mr-1" />
+                    This item is expiring soon. Consider donating it.
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Donations Section */}
+      {donations.length > 0 && (
+        <div className="mt-8 bg-white rounded-lg shadow-md">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-900">
+              Donation Listings ({donations.length})
+            </h2>
+          </div>
+
+          <div className="divide-y divide-gray-200">
+            {donations.map((donation) => (
+              <DonationItemDetails
+                key={donation.docId}
+                donation={donation}
+                onDelete={(id) => {
+                  setDonations((prev) => prev.filter((d) => d.docId !== id));
+                }}
+                onUpdate={(id, updatedData) => {
+                  setDonations((prev) =>
+                    prev.map((d) =>
+                      d.docId === id ? { ...d, ...updatedData } : d
+                    )
+                  );
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      <ConvertDonationModal
+        isOpen={showConvertModal}
+        onClose={() => setShowConvertModal(false)}
+        onConfirm={handleConfirmConversion}
+        pickupLocation={pickupLocation}
+        setPickupLocation={setPickupLocation}
+        availability={availability}
+        setAvailability={setAvailability}
+      />
+    </div>
+  );
+};
 
 export default FoodInventory;
