@@ -1,13 +1,16 @@
 import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
 import Register from "./Register";
 import Login from "./Login";
+import NotificationsBell from "./Components/NotificationsBell";
 import Verify from "./Verify";
 import FoodInventory from "./FoodInventory";
 import TrackAndReport from "./FoodImpactDashboard"; // 👈 ensure this matches your file/export
 import PrivateRoute from "./PrivateRoute";
 import { useState, useEffect } from "react";
+import MealPlanner from "./MealPlanner";
 import { auth } from "../firebase";
 import BrowseFoodItems from "./BrowseFoodItem";
+import NotificationsPage from "./NotificationsPage";
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -27,53 +30,68 @@ export default function App() {
     <BrowserRouter>
       {/* Navbar */}
       <nav className="bg-white shadow-md">
-        <div className="max-w-6xl mx-auto px-6 py-3 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-blue-600">SmartFud</h1>
+  <div className="max-w-6xl mx-auto px-6 py-3 flex justify-between items-center">
+    {/* Left side - logo */}
+    <h1 className="text-xl font-bold text-blue-600 tracking-wide">SmartFud</h1>
 
-          <div className="space-x-4">
-            {/* Only show app pages when logged in */}
-            {user && (
-              <>
-                <Link to="/browsefooditems" className="hover:text-blue-600">
-                  Browse Food Items
-                </Link>
-                <Link to="/foodanalytics" className="hover:text-blue-600">
-                  Food Analytics
-                </Link>
-                <Link to="/foodinv" className="hover:text-blue-600">
-                  Inventory
-                </Link>
-              </>
-            )}
+    {/* Center - navigation links */}
+    <div className="hidden md:flex items-center gap-6 text-gray-700 font-medium">
+      {user && (
+        <>
+          <Link to="/browsefooditems" className="hover:text-blue-600 transition">
+            Browse
+          </Link>
+          <Link to="/foodanalytics" className="hover:text-blue-600 transition">
+            Analytics
+          </Link>
+          <Link to="/foodinv" className="hover:text-blue-600 transition">
+            Inventory
+          </Link>
+          <Link to="/meal-planner" className="hover:text-blue-600 transition">
+            Meal Plans
+          </Link>
+        </>
+      )}
+      <Link to="/" className="hover:text-blue-600 transition">
+        Home
+      </Link>
+    </div>
 
-            <Link to="/" className="hover:text-blue-600">
-              Home
-            </Link>
+    {/* Right side - auth + bell */}
+    <div className="flex items-center gap-4">
+      {user && <NotificationsBell user={user} />}
 
-            {/* Auth links */}
-            {!user ? (
-              <>
-                <Link to="/register" className="hover:text-blue-600">
-                  Register
-                </Link>
-                <Link to="/login" className="hover:text-blue-600">
-                  Login
-                </Link>
-              </>
-            ) : (
-              <button
-                onClick={() => auth.signOut()}
-                className="hover:text-red-600 transition"
-              >
-                Logout
-              </button>
-            )}
-          </div>
-        </div>
-      </nav>
+      {!user ? (
+        <>
+          <Link
+            to="/register"
+            className="text-sm font-medium text-gray-700 hover:text-blue-600"
+          >
+            Register
+          </Link>
+          <Link
+            to="/login"
+            className="text-sm font-medium text-gray-700 hover:text-blue-600"
+          >
+            Login
+          </Link>
+        </>
+      ) : (
+        <button
+          onClick={() => auth.signOut()}
+          className="text-sm font-medium text-red-600 hover:text-red-700 transition"
+        >
+          Logout
+        </button>
+      )}
+    </div>
+  </div>
+</nav>
+
 
       {/* Routes */}
       <Routes>
+        
         <Route
           path="/"
           element={
@@ -116,10 +134,10 @@ export default function App() {
                       Food Analytics
                     </Link>
                     <Link
-                      to="/browsefooditems"
+                     to="/meal-planner"
                       className="border border-blue-600 text-blue-600 px-6 py-2 rounded-lg hover:bg-blue-50 transition"
                     >
-                      Browse Food Items
+                      Meal Plans
                     </Link>
                   </>
                 )}
@@ -127,7 +145,14 @@ export default function App() {
             </div>
           }
         />
-
+<Route
+  path="/meal-planner"
+  element={
+    <PrivateRoute user={user}>
+      <MealPlanner user={user} />
+    </PrivateRoute>
+  }
+/>
         <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
         <Route path="/verify" element={<Verify />} />
@@ -141,6 +166,14 @@ export default function App() {
             </PrivateRoute>
           }
         />
+        <Route
+  path="/notifications"
+  element={
+    <PrivateRoute user={user}>
+      <NotificationsPage user={user} />
+    </PrivateRoute>
+  }
+/>
         <Route
           path="/browsefooditems"
           element={
