@@ -5,7 +5,10 @@ import { useNavigate } from "react-router-dom";
 import useNotifications from "../hooks/useNotifications";
 
 export default function NotificationsBell({ user }) {
-  const { items, unreadCount, markAsRead, markAllAsRead } = useNotifications(user, { limit: 25 });
+  const { items, unreadCount, markAsRead, markAllAsRead } = useNotifications(
+    user,
+    { limit: 25 }
+  );
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const navigate = useNavigate();
@@ -31,11 +34,9 @@ export default function NotificationsBell({ user }) {
     }
     setOpen(false);
   };
-
   const buildUrl = (route, params = {}) => {
     const qs = new URLSearchParams(params).toString();
-    return qs ? $`{route}?${qs}` : route;
-    // Example: route="/meal-planner", params={date:'2025-10-28',slot:'breakfast'}
+    return qs ? `${route}?${qs}` : route;
   };
 
   return (
@@ -68,7 +69,10 @@ export default function NotificationsBell({ user }) {
                 Mark all
               </button>
               <button
-                onClick={() => { setOpen(false); navigate("/notifications"); }}
+                onClick={() => {
+                  setOpen(false);
+                  navigate("/notifications");
+                }}
                 className="text-xs text-blue-600 hover:underline"
               >
                 View all
@@ -78,29 +82,57 @@ export default function NotificationsBell({ user }) {
 
           <div className="max-h-96 overflow-auto divide-y">
             {items.length === 0 ? (
-              <div className="p-4 text-sm text-gray-600">No notifications yet.</div>
+              <div className="p-4 text-sm text-gray-600">
+                No notifications yet.
+              </div>
             ) : (
               items.map((n) => (
                 <button
                   key={n.id}
                   onClick={() => openTarget(n)}
-                  className={`block w-full text-left px-3 py-3 hover:bg-gray-50 ${
-                    !n.read ? "bg-blue-50/50" : ""
+                  className={`block w-full text-left px-3 py-3 hover:bg-gray-50 transition-colors ${
+                    !n.read
+                      ? n.type === "inventory"
+                        ? n.bgColor
+                        : "bg-blue-50/50"
+                      : ""
+                  } ${
+                    n.type === "inventory" ? "border-l-4 " + n.borderColor : ""
                   }`}
                 >
                   <div className="flex items-start gap-2">
-                    {/* dot */}
                     <span
                       className={`mt-1 h-2 w-2 rounded-full ${
-                        n.read ? "bg-gray-300" : "bg-blue-600"
+                        n.read
+                          ? "bg-gray-300"
+                          : n.type === "inventory"
+                          ? n.urgency === "critical"
+                            ? "bg-red-500"
+                            : n.urgency === "urgent"
+                            ? "bg-orange-500"
+                            : n.urgency === "warning"
+                            ? "bg-yellow-500"
+                            : "bg-green-500"
+                          : "bg-blue-600"
                       }`}
                     />
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-medium">
-                        {n.title || "Notification"}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className="truncate text-sm font-medium">
+                          {n.title}
+                        </div>
+                        {!n.read && n.type === "inventory" && (
+                          <span
+                            className={`text-xs px-1.5 py-0.5 rounded ${n.bgColor} ${n.urgencyColor}`}
+                          >
+                            {n.daysLeft}d
+                          </span>
+                        )}
                       </div>
                       {n.body && (
-                        <div className="truncate text-xs text-gray-600">{n.body}</div>
+                        <div className="text-xs text-gray-600 whitespace-pre-line">
+                          {n.body}
+                        </div>
                       )}
                       <div className="mt-1 text-[11px] text-gray-500">
                         {formatWhen(n.createdAt)}
@@ -120,11 +152,9 @@ export default function NotificationsBell({ user }) {
 function formatWhen(d) {
   if (!d) return "";
   const now = Date.now();
-  const diff = Math.floor((now - new Date(d).getTime()) / 1000); // seconds
-  
+  const diff = Math.floor((now - new Date(d).getTime()) / 1000); // s
   if (diff < 60) return "Just now";
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  
   return new Date(d).toLocaleString();
 }
