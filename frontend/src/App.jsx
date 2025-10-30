@@ -11,6 +11,7 @@ import MealPlanner from "./MealPlanner";
 import { auth } from "../firebase";
 import BrowseFoodItems from "./BrowseFoodItem";
 import NotificationsPage from "./NotificationsPage";
+import AllDonationsPage from "./AllDonationsPage";
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -30,68 +31,77 @@ export default function App() {
     <BrowserRouter>
       {/* Navbar */}
       <nav className="bg-white shadow-md">
-  <div className="max-w-6xl mx-auto px-6 py-3 flex justify-between items-center">
-    {/* Left side - logo */}
-    <h1 className="text-xl font-bold text-blue-600 tracking-wide">SmartFud</h1>
+        <div className="max-w-6xl mx-auto px-6 py-3 flex justify-between items-center">
+          {/* Left side - logo */}
+          <Link to="/" className="text-xl font-bold text-blue-600 tracking-wide hover:text-blue-700 transition">
+            SmartFud
+          </Link>
 
-    {/* Center - navigation links */}
-    <div className="hidden md:flex items-center gap-6 text-gray-700 font-medium">
-      {user && (
-        <>
-          <Link to="/browsefooditems" className="hover:text-blue-600 transition">
-            Browse
-          </Link>
-          <Link to="/foodanalytics" className="hover:text-blue-600 transition">
-            Analytics
-          </Link>
-          <Link to="/foodinv" className="hover:text-blue-600 transition">
-            Inventory
-          </Link>
-          <Link to="/meal-planner" className="hover:text-blue-600 transition">
-            Meal Plans
-          </Link>
-        </>
-      )}
-      <Link to="/" className="hover:text-blue-600 transition">
-        Home
-      </Link>
-    </div>
+          {/* Center - navigation links */}
+          <div className="hidden md:flex items-center gap-6 text-gray-700 font-medium">
+            {user && (
+              <>
+                <Link
+                  to="/browsefooditems"
+                  className="hover:text-blue-600 transition"
+                >
+                  Browse
+                </Link>
+                <Link
+                  to="/foodanalytics"
+                  className="hover:text-blue-600 transition"
+                >
+                  Analytics
+                </Link>
+                <Link to="/foodinv" className="hover:text-blue-600 transition">
+                  Inventory
+                </Link>
+                <Link
+                  to="/meal-planner"
+                  className="hover:text-blue-600 transition"
+                >
+                  Meal Plans
+                </Link>
+              </>
+            )}
+            <Link to="/all-donations" className="hover:text-blue-600 transition">
+              Donations
+            </Link>
+          </div>
 
-    {/* Right side - auth + bell */}
-    <div className="flex items-center gap-4">
-      {user && <NotificationsBell user={user} />}
+          {/* Right side - auth + bell */}
+          <div className="flex items-center gap-4">
+            {user && <NotificationsBell user={user} />}
 
-      {!user ? (
-        <>
-          <Link
-            to="/register"
-            className="text-sm font-medium text-gray-700 hover:text-blue-600"
-          >
-            Register
-          </Link>
-          <Link
-            to="/login"
-            className="text-sm font-medium text-gray-700 hover:text-blue-600"
-          >
-            Login
-          </Link>
-        </>
-      ) : (
-        <button
-          onClick={() => auth.signOut()}
-          className="text-sm font-medium text-red-600 hover:text-red-700 transition"
-        >
-          Logout
-        </button>
-      )}
-    </div>
-  </div>
-</nav>
-
+            {!user ? (
+              <>
+                <Link
+                  to="/register"
+                  className="text-sm font-medium text-gray-700 hover:text-blue-600"
+                >
+                  Register
+                </Link>
+                <Link
+                  to="/login"
+                  className="text-sm font-medium text-gray-700 hover:text-blue-600"
+                >
+                  Login
+                </Link>
+              </>
+            ) : (
+              <button
+                onClick={() => auth.signOut()}
+                className="text-sm font-medium text-red-600 hover:text-red-700 transition"
+              >
+                Logout
+              </button>
+            )}
+          </div>
+        </div>
+      </nav>
 
       {/* Routes */}
       <Routes>
-        
         <Route
           path="/"
           element={
@@ -100,7 +110,8 @@ export default function App() {
                 Hi Welcome to <span className="text-blue-600">SmartFud</span>
               </h2>
               <p className="text-gray-600 max-w-lg mb-6">
-                Track your food, plan meals, and reduce waste — all in one place.
+                Track your food, plan meals, and reduce waste — all in one
+                place.
               </p>
 
               <div className="space-x-4">
@@ -134,7 +145,7 @@ export default function App() {
                       Food Analytics
                     </Link>
                     <Link
-                     to="/meal-planner"
+                      to="/meal-planner"
                       className="border border-blue-600 text-blue-600 px-6 py-2 rounded-lg hover:bg-blue-50 transition"
                     >
                       Meal Plans
@@ -145,14 +156,15 @@ export default function App() {
             </div>
           }
         />
-<Route
-  path="/meal-planner"
-  element={
-    <PrivateRoute user={user}>
-      <MealPlanner user={user} />
-    </PrivateRoute>
-  }
-/>
+        <Route
+          path="/meal-planner"
+          element={
+            <PrivateRoute user={user}>
+              <MealPlanner user={user} />
+            </PrivateRoute>
+          }
+        />
+        <Route path="/all-donations" element={<AllDonationsPage />} />
         <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
         <Route path="/verify" element={<Verify />} />
@@ -167,13 +179,13 @@ export default function App() {
           }
         />
         <Route
-  path="/notifications"
-  element={
-    <PrivateRoute user={user}>
-      <NotificationsPage user={user} />
-    </PrivateRoute>
-  }
-/>
+          path="/notifications"
+          element={
+            <PrivateRoute user={user}>
+              <NotificationsPage user={user} />
+            </PrivateRoute>
+          }
+        />
         <Route
           path="/browsefooditems"
           element={
