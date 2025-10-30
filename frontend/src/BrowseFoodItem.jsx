@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   collection,
   query,
@@ -17,7 +17,6 @@ import {
   Calendar,
   Package,
   Gift,
-  Utensils,
   X,
   Eye,
   ChefHat,
