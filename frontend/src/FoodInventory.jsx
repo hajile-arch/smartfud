@@ -4,7 +4,7 @@ import {
   collection,
   addDoc,
   query,
-  where,
+  getDoc,
   onSnapshot,
   doc,
   updateDoc,
@@ -57,47 +57,58 @@ const FoodInventory = () => {
 
   // Handler for modal confirmation
   const handleConfirmConversion = async () => {
-    if (!pickupLocation || !availability) {
-      alert("Please fill in all fields");
-      return;
-    }
-    try {
-      const donationData = {
-        ...selectedItem,
-        // originalItemId: selectedItem.id,
-        status: "donated",
-        pickupLocation,
-        availability,
-        contactInfo: user.email,
-        createdAt: new Date(),
-      };
+  if (!pickupLocation || !availability) {
+    alert("Please fill in all fields");
+    return;
+  }
 
-      // Save donation
-      await addDoc(
-        collection(db, "users", user.uid, "donations"),
-        donationData
-      );
+  try {
+    const user = auth.currentUser;
+    if (!user) return alert("You must be logged in.");
 
-      // Update inventory item
-      await updateDoc(
-        doc(db, "users", user.uid, "inventory", selectedItem.id),
-        { status: "donated", donatedAt: new Date() }
-      );
-      // Remove from Firestore
-      await deleteDoc(doc(db, "users", user.uid, "inventory", selectedItem.id));
+    // ✅ Get the user's Firestore data to access fullName
+    const userDoc = await getDoc(doc(db, "users", user.uid));
+    const userData = userDoc.data();
+    // Extract first name (split by space)
+const firstName =
+  userData?.fullName?.split(" ")[0] ||
+  user.displayName?.split(" ")[0] ||
+  "Anonymous";
 
-      // Remove from local state
-      setItems((prevItems) =>
-        prevItems.filter((item) => item.id !== selectedItem.id)
-      );
-      alert("Item successfully converted to donation!");
-      setShowConvertModal(false);
-      setSelectedItem(null);
-    } catch (error) {
-      console.error("   Error converting item:", error);
-      alert("Error converting item. Please try again.");
-    }
-  };
+
+
+    const donationData = {
+      ...selectedItem,
+      status: "donated",
+      pickupLocation,
+      availability,
+      contactInfo: user.email,
+      createdAt: new Date(),
+
+      // ✅ Add donor info directly
+      ownerUid: user.uid,
+ownerFullName: firstName,
+};
+
+    // Save donation
+    await addDoc(collection(db, "users", user.uid, "donations"), donationData);
+
+    // Update inventory and delete old doc
+    await updateDoc(doc(db, "users", user.uid, "inventory", selectedItem.id), {
+      status: "donated",
+      donatedAt: new Date(),
+    });
+    await deleteDoc(doc(db, "users", user.uid, "inventory", selectedItem.id));
+
+    setItems((prev) => prev.filter((item) => item.id !== selectedItem.id));
+    alert("Item successfully converted to donation!");
+    setShowConvertModal(false);
+    setSelectedItem(null);
+  } catch (error) {
+    console.error("Error converting item:", error);
+    alert("Error converting item. Please try again.");
+  }
+};
   // Check authentication
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
