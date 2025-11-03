@@ -5,38 +5,34 @@ import { collectionGroup, query, orderBy, onSnapshot } from "firebase/firestore"
 import AllDonationItemDetails from "./Components/AllDonationItemDetails";
 import { AlertTriangle } from "lucide-react";
 
-// tiny helper: Timestamp|Date|string|null -> Date|null
 const toJsDate = (v) => {
   if (!v) return null;
-  if (typeof v?.toDate === "function") return v.toDate();
+  if (typeof v?.toDate === "function") return v.toDate(); // Firestore Timestamp
   if (v instanceof Date) return v;
   const ms = Date.parse(v);
   return Number.isNaN(ms) ? null : new Date(ms);
 };
 
-const AllDonationsPage = () => {
+export default function AllDonationsPage() {
   const [uid, setUid] = useState(null);
   const [donations, setDonations] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // get current user id
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => setUid(u?.uid ?? null));
-    return () => unsub();
-  }, []);
+  useEffect(() => onAuthStateChanged(auth, (u) => setUid(u?.uid ?? null)), []);
 
   useEffect(() => {
     const q = query(collectionGroup(db, "donations"), orderBy("createdAt", "desc"));
     const unsub = onSnapshot(
       q,
       (snap) => {
-        const all = snap.docs.map((doc) => {
-          const data = doc.data();
-          const owner = doc.ref.parent.parent?.id ?? null;
+        const all = snap.docs.map((d) => {
+          const data = d.data();
+          const owner = d.ref.parent.parent?.id ?? null;
           return {
-            userId: owner,            // keep the name your item component expects
-            ownerUid: owner,
-            docId: doc.id,
+            userId: owner,                 // owner uid
+            docId: d.id,
+            // prefer denormalized names written at create-time
+            ownerFullName: data.ownerFullName || data.ownerDisplayName || null,
             ...data,
             expiry: toJsDate(data?.expiry),
             createdAt: toJsDate(data?.createdAt),
@@ -78,9 +74,10 @@ const AllDonationsPage = () => {
               key={donation.docId}
               donation={donation}
               currentUid={uid}
-              onDelete={(id) =>
-                setDonations((prev) => prev.filter((d) => d.docId !== id))
-              }
+              // pass a clean owner name to the card
+              ownerName={donation.ownerFullName || "Anonymous"}
+
+              onDelete={(id) => setDonations((prev) => prev.filter((d) => d.docId !== id))}
               onUpdate={(id, patch) =>
                 setDonations((prev) =>
                   prev.map((d) => (d.docId === id ? { ...d, ...patch } : d))
@@ -92,6 +89,4 @@ const AllDonationsPage = () => {
       )}
     </div>
   );
-};
-
-export default AllDonationsPage;
+}
