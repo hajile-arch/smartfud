@@ -7,7 +7,7 @@ import FoodInventory from "./FoodInventory";
 import TrackAndReport from "./FoodImpactDashboard"; // 👈 ensure this matches your file/export
 import PrivateRoute from "./PrivateRoute";
 import { useState, useEffect } from "react";
-import MealPlanner from "./MealPlanner";
+// import MealPlanner from "./MealPlanner";
 import { auth } from "../firebase";
 import BrowseFoodItems from "./BrowseFoodItem";
 import NotificationsPage from "./NotificationsPage";
@@ -156,14 +156,14 @@ export default function App() {
             </div>
           }
         />
-        <Route
+        {/* <Route
           path="/meal-planner"
           element={
             <PrivateRoute user={user}>
               <MealPlanner user={user} />
             </PrivateRoute>
           }
-        />
+        /> */}
         <Route path="/all-donations" element={<AllDonationsPage />} />
         <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
