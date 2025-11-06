@@ -2,19 +2,14 @@ import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
 import Register from "./Register";
 import Login from "./Login";
 import NotificationsBell from "./Components/NotificationsBell";
-import NotificationsBell from "./Components/NotificationsBell";
 import Verify from "./Verify";
 import FoodInventory from "./FoodInventory";
-import TrackAndReport from "./FoodImpactDashboard"; // 👈 ensure this matches your file/export
-import PrivateRoute from "./PrivateRoute";
 import TrackAndReport from "./FoodImpactDashboard"; // 👈 ensure this matches your file/export
 import PrivateRoute from "./PrivateRoute";
 import { useState, useEffect } from "react";
 import MealPlanner from "./MealPlanner";
 import { auth } from "../firebase";
 import BrowseFoodItems from "./BrowseFoodItem";
-import NotificationsPage from "./NotificationsPage";
-import AllDonationsPage from "./AllDonationsPage";
 import NotificationsPage from "./NotificationsPage";
 import AllDonationsPage from "./AllDonationsPage";
 
@@ -29,9 +24,6 @@ export default function App() {
     });
     return () => unsubscribe();
   }, []);
-
-  if (loading) return <div>Loading...</div>;
-
 
   if (loading) return <div>Loading...</div>;
 
@@ -104,75 +96,10 @@ export default function App() {
                 Logout
               </button>
             )}
-          {/* Left side - logo */}
-          <Link to="/" className="text-xl font-bold text-blue-600 tracking-wide hover:text-blue-700 transition">
-            SmartFud
-          </Link>
-
-          {/* Center - navigation links */}
-          <div className="hidden md:flex items-center gap-6 text-gray-700 font-medium">
-            {user && (
-              <>
-                <Link
-                  to="/browsefooditems"
-                  className="hover:text-blue-600 transition"
-                >
-                  Browse
-                </Link>
-                <Link
-                  to="/foodanalytics"
-                  className="hover:text-blue-600 transition"
-                >
-                  Analytics
-                </Link>
-                <Link to="/foodinv" className="hover:text-blue-600 transition">
-                  Inventory
-                </Link>
-                <Link
-                  to="/meal-planner"
-                  className="hover:text-blue-600 transition"
-                >
-                  Meal Plans
-                </Link>
-              </>
-            )}
-            <Link to="/all-donations" className="hover:text-blue-600 transition">
-              Donations
-            </Link>
-          </div>
-
-          {/* Right side - auth + bell */}
-          <div className="flex items-center gap-4">
-            {user && <NotificationsBell user={user} />}
-
-            {!user ? (
-              <>
-                <Link
-                  to="/register"
-                  className="text-sm font-medium text-gray-700 hover:text-blue-600"
-                >
-                  Register
-                </Link>
-                <Link
-                  to="/login"
-                  className="text-sm font-medium text-gray-700 hover:text-blue-600"
-                >
-                  Login
-                </Link>
-              </>
-            ) : (
-              <button
-                onClick={() => auth.signOut()}
-                className="text-sm font-medium text-red-600 hover:text-red-700 transition"
-              >
-                Logout
-              </button>
-            )}
           </div>
         </div>
       </nav>
 
-      {/* Routes */}
       {/* Routes */}
       <Routes>
         
@@ -184,8 +111,6 @@ export default function App() {
                 Hi Welcome to <span className="text-blue-600">SmartFud</span>
               </h2>
               <p className="text-gray-600 max-w-lg mb-6">
-                Track your food, plan meals, and reduce waste — all in one
-                place.
                 Track your food, plan meals, and reduce waste — all in one
                 place.
               </p>
@@ -221,9 +146,10 @@ export default function App() {
                       Food Analytics
                     </Link>
                     <Link
-                      to="/meal-planner"
+                     to="/meal-planner"
                       className="border border-blue-600 text-blue-600 px-6 py-2 rounded-lg hover:bg-blue-50 transition"
                     >
+                      Meal Plans
                       Meal Plans
                     </Link>
                   </>
@@ -246,12 +172,9 @@ export default function App() {
         <Route path="/verify" element={<Verify />} />
 
         {/* Protected routes (pass user + loading into PrivateRoute) */}
-
-        {/* Protected routes (pass user + loading into PrivateRoute) */}
         <Route
           path="/foodinv"
           element={
-            <PrivateRoute user={user} loading={loading}>
             <PrivateRoute user={user} loading={loading}>
               <FoodInventory />
             </PrivateRoute>
@@ -259,17 +182,8 @@ export default function App() {
         />
         <Route
           path="/notifications"
-          path="/notifications"
           element={
             <PrivateRoute user={user}>
-              <NotificationsPage user={user} />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/browsefooditems"
-          element={
-            <PrivateRoute user={user} loading={loading}>
               <NotificationsPage user={user} />
             </PrivateRoute>
           }
@@ -290,16 +204,7 @@ export default function App() {
             </PrivateRoute>
           }
         />
-        <Route
-          path="/foodanalytics"
-          element={
-            <PrivateRoute user={user} loading={loading}>
-              <TrackAndReport user={user} />
-            </PrivateRoute>
-          }
-        />
       </Routes>
     </BrowserRouter>
   );
 }
-
