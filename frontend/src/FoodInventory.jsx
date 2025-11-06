@@ -4,7 +4,7 @@ import {
   collection,
   addDoc,
   query,
-  where,
+  getDoc,
   onSnapshot,
   doc,
   updateDoc,
@@ -29,9 +29,11 @@ import {
   AlertTriangle,
   X,
 } from "lucide-react";
+import { initialFormData, categories } from "./Config/constants";
+import FoodInventoryHeader from "./Components/FoodInventoryHeader";
+import FoodInventoryForm from "./Components/FoodInventoryForm";
 
 const FoodInventory = () => {
-  const [foodItems, setFoodItems] = useState([]);
   const [showConvertModal, setShowConvertModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [pickupLocation, setPickupLocation] = useState("");
@@ -45,7 +47,7 @@ const FoodInventory = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [expiryFilter, setExpiryFilter] = useState("all");
-
+  const [formData, setFormData] = useState(initialFormData);
   const handleOpenConvertModal = (item) => {
     setSelectedItem(item);
     setPickupLocation("");
@@ -55,70 +57,58 @@ const FoodInventory = () => {
 
   // Handler for modal confirmation
   const handleConfirmConversion = async () => {
-    if (!pickupLocation || !availability) {
-      alert("Please fill in all fields");
-      return;
-    }
-    try {
-      const donationData = {
-        ...selectedItem,
-        // originalItemId: selectedItem.id,
-        status: "donated",
-        pickupLocation,
-        availability,
-        contactInfo: user.email,
-        createdAt: new Date(),
-      };
+  if (!pickupLocation || !availability) {
+    alert("Please fill in all fields");
+    return;
+  }
 
-      // Save donation
-      await addDoc(
-        collection(db, "users", user.uid, "donations"),
-        donationData
-      );
+  try {
+    const user = auth.currentUser;
+    if (!user) return alert("You must be logged in.");
 
-      // Update inventory item
-      await updateDoc(
-        doc(db, "users", user.uid, "inventory", selectedItem.id),
-        { status: "donated", donatedAt: new Date() }
-      );
-      // Remove from Firestore
-      await deleteDoc(doc(db, "users", user.uid, "inventory", selectedItem.id));
+    // ✅ Get the user's Firestore data to access fullName
+    const userDoc = await getDoc(doc(db, "users", user.uid));
+    const userData = userDoc.data();
+    // Extract first name (split by space)
+const firstName =
+  userData?.fullName?.split(" ")[0] ||
+  user.displayName?.split(" ")[0] ||
+  "Anonymous";
 
-      // Remove from local state
-      setItems((prevItems) =>
-        prevItems.filter((item) => item.id !== selectedItem.id)
-      );
-      alert("Item successfully converted to donation!");
-      setShowConvertModal(false);
-      setSelectedItem(null);
-    } catch (error) {
-      console.error("   Error converting item:", error);
-      alert("Error converting item. Please try again.");
-    }
-  };
-  // Form state
-  const [formData, setFormData] = useState({
-    name: "",
-    quantity: "",
-    expiry: "",
-    category: "",
-    location: "",
-    notes: "",
-  });
 
-  // Categories
-  const categories = [
-    "Fruits & Vegetables",
-    "Dairy & Eggs",
-    "Meat & Poultry",
-    "Grains & Bread",
-    "Canned Goods",
-    "Frozen Foods",
-    "Beverages",
-    "Snacks",
-    "Other",
-  ];
 
+    const donationData = {
+      ...selectedItem,
+      status: "donated",
+      pickupLocation,
+      availability,
+      contactInfo: user.email,
+      createdAt: new Date(),
+
+      // ✅ Add donor info directly
+      ownerUid: user.uid,
+ownerFullName: firstName,
+};
+
+    // Save donation
+    await addDoc(collection(db, "users", user.uid, "donations"), donationData);
+
+    // Update inventory and delete old doc
+    await updateDoc(doc(db, "users", user.uid, "inventory", selectedItem.id), {
+      status: "donated",
+      donatedAt: new Date(),
+    });
+    await deleteDoc(doc(db, "users", user.uid, "inventory", selectedItem.id));
+
+    setItems((prev) => prev.filter((item) => item.id !== selectedItem.id));
+    alert("Item successfully converted to donation!");
+    setShowConvertModal(false);
+    setSelectedItem(null);
+  } catch (error) {
+    console.error("Error converting item:", error);
+    alert("Error converting item. Please try again.");
+  }
+};
   // Check authentication
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -178,18 +168,16 @@ const FoodInventory = () => {
   };
 
   // Handle form input changes
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
+  // const handleInputChange = (e) => {
+  //   const { name, value } = e.target;
+  //   setFormData((prev) => ({
+  //     ...prev,
+  //     [name]: value,
+  //   }));
+  // };
 
   // Add or update item
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
+  const handleSubmit = async (formData, editingItem) => {
     // Validation
     if (
       !formData.name ||
@@ -222,23 +210,14 @@ const FoodInventory = () => {
         await addDoc(collection(db, "users", user.uid, "inventory"), itemData);
       }
 
-      // Reset form
-      setFormData({
-        name: "",
-        quantity: "",
-        expiry: "",
-        category: "",
-        location: "",
-        notes: "",
-      });
-      setEditingItem(null);
+      // Reset form and close modal
       setShowForm(false);
+      setEditingItem(null);
     } catch (error) {
       console.error("Error saving item:", error);
       alert("Error saving item. Please try again.");
     }
   };
-
   // Edit item
   const handleEdit = (item) => {
     setEditingItem(item);
@@ -261,40 +240,6 @@ const FoodInventory = () => {
       } catch (error) {
         console.error("Error deleting item:", error);
         alert("Error deleting item. Please try again.");
-      }
-    }
-  };
-
-  // Convert to donation
-  const handleConvertToDonation = async (item) => {
-    if (window.confirm(`Convert "${item.name}" to donation?`)) {
-      try {
-        // Add to donations
-        const donationData = {
-          ...item,
-          originalItemId: item.id,
-          status: "available",
-          pickupLocation: "",
-          availability: "",
-          contactInfo: user.email,
-          createdAt: new Date(),
-        };
-
-        await addDoc(
-          collection(db, "users", user.uid, "donations"),
-          donationData
-        );
-
-        // Update inventory item status
-        await updateDoc(doc(db, "users", user.uid, "inventory", item.id), {
-          status: "donated",
-          donatedAt: new Date(),
-        });
-
-        alert("Item converted to donation successfully!");
-      } catch (error) {
-        console.error("Error converting to donation:", error);
-        alert("Error converting item to donation. Please try again.");
       }
     }
   };
@@ -335,8 +280,9 @@ const FoodInventory = () => {
       matchesSearch &&
       matchesCategory &&
       matchesExpiry &&
-      (item.status === "active" || item.status === "donated" ||
-      item.status === "planned")
+      (item.status === "active" ||
+        item.status === "donated" ||
+        item.status === "planned")
     );
   });
 
@@ -363,83 +309,11 @@ const FoodInventory = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Food Inventory</h1>
-          <p className="text-gray-600 mt-2">
-            Manage your food items and reduce waste
-          </p>
-        </div>
-        <button
-          onClick={() => setShowForm(true)}
-          className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 flex items-center"
-        >
-          <Plus className="h-5 w-5 mr-2" />
-          Add Food Item
-        </button>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <div className="flex items-center">
-            <Package className="h-8 w-8 text-blue-500" />
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Total Items</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {items.filter((i) => i.status === "active" || i.status === "planned").length}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <div className="flex items-center">
-            <AlertTriangle className="h-8 w-8 text-red-500" />
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Expiring Soon</p>
-              <p className="text-2xl font-bold text-red-600">
-                {
-                  items.filter(
-                    (item) =>
-                      isExpiringSoon(item.expiry) && item.status === "active"
-                  ).length
-                }
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <div className="flex items-center">
-            <Clock className="h-8 w-8 text-orange-500" />
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Expired</p>
-              <p className="text-2xl font-bold text-orange-600">
-                {
-                  items.filter(
-                    (item) => isExpired(item.expiry) && item.status === "active"
-                  ).length
-                }
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <div className="flex items-center">
-            <Gift className="h-8 w-8 text-green-500" />
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Donations</p>
-              <p className="text-2xl font-bold text-green-600">
-                {donations.length}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
+      <FoodInventoryHeader
+        items={items}
+        donations={donations}
+        onAddItem={() => setShowForm(true)}
+      />
       {/* Filters and Search */}
       <div className="bg-white p-6 rounded-lg shadow-md mb-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -492,138 +366,17 @@ const FoodInventory = () => {
       </div>
 
       {/* Add/Edit Form Modal */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">
-                {editingItem ? "Edit Food Item" : "Add Food Item"}
-              </h3>
-              <button
-                onClick={() => {
-                  setShowForm(false);
-                  setEditingItem(null);
-                }}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Item Name *
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Quantity *
-                </label>
-                <input
-                  type="number"
-                  name="quantity"
-                  value={formData.quantity}
-                  onChange={handleInputChange}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-                  min="1"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Expiry Date *
-                </label>
-                <input
-                  type="date"
-                  name="expiry"
-                  value={formData.expiry}
-                  onChange={handleInputChange}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Category *
-                </label>
-                <select
-                  name="category"
-                  value={formData.category}
-                  onChange={handleInputChange}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-                  required
-                >
-                  <option value="">Select Category</option>
-                  {categories.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Storage Location
-                </label>
-                <input
-                  type="text"
-                  name="location"
-                  value={formData.location}
-                  onChange={handleInputChange}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-                  placeholder="e.g., Pantry, Fridge, Freezer"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Notes
-                </label>
-                <textarea
-                  name="notes"
-                  value={formData.notes}
-                  onChange={handleInputChange}
-                  rows="3"
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-                  placeholder="Additional notes..."
-                />
-              </div>
-
-              <div className="flex space-x-3 pt-4">
-                <button
-                  type="submit"
-                  className="flex-1 bg-green-500 text-white py-2 px-4 rounded-md hover:bg-green-600"
-                >
-                  {editingItem ? "Update Item" : "Add Item"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowForm(false);
-                    setEditingItem(null);
-                  }}
-                  className="flex-1 bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <FoodInventoryForm
+        showForm={showForm}
+        editingItem={editingItem}
+        onClose={() => {
+          setShowForm(false);
+          setEditingItem(null);
+        }}
+        onSubmit={handleSubmit}
+        formData={formData}
+        onInputChange={setFormData}
+      />
 
       {/* Inventory List */}
       <div className="bg-white rounded-lg shadow-md">
