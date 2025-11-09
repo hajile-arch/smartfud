@@ -1,8 +1,46 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+    function signedIn() { return request.auth != null; }
+    function isOwner(userId) { return signedIn() && request.auth.uid == userId; }
+
+    // Allow collection-group reads of donations everywhere
+    match /{path=**}/donations/{donationId} {
+      allow read: if true;
+    }
+
+    match /users/{userId} {
+
+      // Owner-only inventory
+      match /inventory/{itemId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && (request.resource.data.status == "in-inventory" || request.resource.data.status == "active")
+          && request.resource.data.keys().hasOnly([
+            "name","quantity","fromDonationId","fromUserId",
+            "pickupLocation","availability","addedAt","expiry","status"
+          ]);
+        allow update, delete: if isOwner(userId);
+      }
+
+      // Donations: owner manages; non-owner can redeem (only status/redeemedBy/redeemedAt)
+      match /donations/{donationId} {
+        allow create, update, delete: if isOwner(userId);
+
+        allow update: if signedIn()
+          && request.auth.uid != userId
+          && resource.data.status != "redeemed"
+          && request.resource.data.status == "redeemed"
+          && request.resource.data.redeemedBy == request.auth.uid
+          && request.resource.data.diff(resource.data).changedKeys()
+               .hasOnly(["status","redeemedBy","redeemedAt"]);
+      }
+
+      // Any other subcollections under users/*: owner-only
+      match /{document=**} {
+        allow read, write: if isOwner(userId);
+      }
     }
   }
 }
