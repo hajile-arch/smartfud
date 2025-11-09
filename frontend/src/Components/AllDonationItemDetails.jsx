@@ -1,9 +1,22 @@
 import React, { useState } from "react";
-import { doc, updateDoc, deleteDoc, writeBatch, collection, serverTimestamp } from "firebase/firestore";
+import {
+  doc,
+  updateDoc,
+  deleteDoc,
+  writeBatch,
+  collection,
+  serverTimestamp,
+} from "firebase/firestore";
 import { db } from "../../firebase";
 import { X, Edit, Trash2 } from "lucide-react";
 
-const AllDonationItemDetails = ({ donation, currentUid, onDelete, onUpdate }) => {
+const AllDonationItemDetails = ({
+  donation,
+  ownerName,         // ← renamed prop
+  currentUid,
+  onDelete,
+  onUpdate,
+}) => {
   const isMine = currentUid && donation.userId === currentUid;
   const isExpired = donation.expiry instanceof Date && donation.expiry < new Date();
   const isRedeemed = donation.status === "redeemed";
@@ -14,7 +27,6 @@ const AllDonationItemDetails = ({ donation, currentUid, onDelete, onUpdate }) =>
   const [formData, setFormData] = useState({
     name: donation.name || "",
     quantity: donation.quantity ?? "",
-    // yyyy-mm-dd for <input type="date">
     expiry: donation.expiry ? new Date(donation.expiry).toISOString().slice(0, 10) : "",
     pickupLocation: donation.pickupLocation || "",
     availability: donation.availability || "",
@@ -33,14 +45,14 @@ const AllDonationItemDetails = ({ donation, currentUid, onDelete, onUpdate }) =>
       const donationRef = doc(db, "users", donation.userId, "donations", donation.docId);
       await updateDoc(donationRef, {
         name: formData.name,
-        quantity: parseInt(formData.quantity, 10),
+        quantity: parseInt(formData.quantity, 10) || 0,
         expiry: formData.expiry ? new Date(formData.expiry) : null,
         pickupLocation: formData.pickupLocation,
         availability: formData.availability,
       });
       onUpdate(donation.docId, {
         ...formData,
-        quantity: parseInt(formData.quantity, 10),
+        quantity: parseInt(formData.quantity, 10) || 0,
         expiry: formData.expiry ? new Date(formData.expiry) : null,
       });
       setIsEditing(false);
@@ -92,7 +104,6 @@ const AllDonationItemDetails = ({ donation, currentUid, onDelete, onUpdate }) =>
         status: "in-inventory",
       });
 
-      // only safe, limited fields change on donation
       batch.update(donationRef, {
         status: "redeemed",
         redeemedBy: currentUid,
@@ -100,7 +111,6 @@ const AllDonationItemDetails = ({ donation, currentUid, onDelete, onUpdate }) =>
       });
 
       await batch.commit();
-
       onUpdate(donation.docId, { status: "redeemed", redeemedBy: currentUid });
     } catch (e) {
       console.error("Redeem failed:", e);
@@ -118,7 +128,7 @@ const AllDonationItemDetails = ({ donation, currentUid, onDelete, onUpdate }) =>
         <h4 className="font-semibold">
           {donation.name}{" "}
           <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
-            {isMine ? "Mine" : "Others"}
+{isMine ? "Mine" : `by ${ownerName || "Anonymouss"}`}
           </span>
           {isRedeemed && (
             <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">
@@ -190,8 +200,12 @@ const AllDonationItemDetails = ({ donation, currentUid, onDelete, onUpdate }) =>
             <input name="availability" value={formData.availability} onChange={handleChange} className="w-full border rounded px-2 py-1" />
 
             <div className="flex gap-2 mt-2">
-              <button onClick={handleSave} disabled={busy} className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded">Save</button>
-              <button onClick={() => setIsEditing(false)} className="bg-gray-200 text-gray-700 px-3 py-1 rounded hover:bg-gray-300">Cancel</button>
+              <button onClick={handleSave} disabled={busy} className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded">
+                Save
+              </button>
+              <button onClick={() => setIsEditing(false)} className="bg-gray-200 text-gray-700 px-3 py-1 rounded hover:bg-gray-300">
+                Cancel
+              </button>
             </div>
           </div>
         </div>
