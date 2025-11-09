@@ -75,7 +75,7 @@ export default function AllDonationsPage() {
               donation={donation}
               currentUid={uid}
               // pass a clean owner name to the card
-              ownerName={donation.ownerFullName || "Anonymous"}
+              ownerName={donation.ownerFullName || "Anonymosssus"}
 
               onDelete={(id) => setDonations((prev) => prev.filter((d) => d.docId !== id))}
               onUpdate={(id, patch) =>

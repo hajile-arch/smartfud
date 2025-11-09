@@ -96,12 +96,13 @@ const AllDonationItemDetails = ({
         name: donation.name,
         quantity: Number(donation.quantity) || 0,
         fromDonationId: donation.docId,
+        category: donation.category,
         fromUserId: donation.userId,
         pickupLocation: donation.pickupLocation || "",
         availability: donation.availability || "",
         addedAt: serverTimestamp(),
         expiry: donation.expiry || null,
-        status: "in-inventory",
+        status: "active",
       });
 
       batch.update(donationRef, {
