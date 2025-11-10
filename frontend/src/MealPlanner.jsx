@@ -135,7 +135,6 @@ const expiryTone = (d) => {
   return "bg-emerald-100 text-emerald-800 border-emerald-200";
 };
 
-
     // Function to show a notification
   const showToast = (message, type = 'error') => {
     setNotification({ message, type });
