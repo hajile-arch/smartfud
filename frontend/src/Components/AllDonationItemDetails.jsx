@@ -1,12 +1,5 @@
 import React, { useState } from "react";
-import {
-  doc,
-  updateDoc,
-  deleteDoc,
-  writeBatch,
-  collection,
-  serverTimestamp,
-} from "firebase/firestore";
+import { doc, updateDoc, deleteDoc, writeBatch, collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../../firebase";
 import { X, Edit, Trash2 } from "lucide-react";
 
@@ -81,45 +74,67 @@ const AllDonationItemDetails = ({
   };
 
   // Redeem others' donation -> copy to my inventory + mark donation redeemed
-  const handleRedeem = async () => {
-    if (!currentUid) return alert("Please sign in to redeem.");
-    if (isMine) return alert("You cannot redeem your own donation.");
-    if (isExpired || isRedeemed) return;
+ const handleRedeem = async () => {
+  console.log("Redeem start", donation.name);
+  if (!currentUid) return alert("Please sign in to redeem.");
+  if (isMine) return alert("You cannot redeem your own donation.");
+  if (isExpired || isRedeemed) return;
 
-    try {
-      setBusy(true);
-      const donationRef = doc(db, "users", donation.userId, "donations", donation.docId);
-      const invRef = doc(collection(db, "users", currentUid, "inventory"));
+  try {
+    setBusy(true);
 
-      const batch = writeBatch(db);
-      batch.set(invRef, {
-        name: donation.name,
-        quantity: Number(donation.quantity) || 0,
-        fromDonationId: donation.docId,
-        category: donation.category,
-        fromUserId: donation.userId,
-        pickupLocation: donation.pickupLocation || "",
-        availability: donation.availability || "",
-        addedAt: serverTimestamp(),
-        expiry: donation.expiry || null,
-        status: "active",
-      });
+    const donorUid = donation.userId;
+    console.log("donorUid for notification:", donorUid, "donationId:", donation.docId);
+    const donationRef = doc(db, "users", donorUid, "donations", donation.docId);
+    const invRef = doc(collection(db, "users", currentUid, "inventory"));
+    const donorNotifsCol = collection(db, "users", donorUid, "notifications");
 
-      batch.update(donationRef, {
-        status: "redeemed",
-        redeemedBy: currentUid,
-        redeemedAt: serverTimestamp(),
-      });
+    const batch = writeBatch(db);
+    batch.set(invRef, {
+      name: donation.name,
+      quantity: Number(donation.quantity) || 0,
+      fromDonationId: donation.docId,
+      fromUserId: donorUid,
+      pickupLocation: donation.pickupLocation || "",
+      availability: donation.availability || "",
+      addedAt: serverTimestamp(),
+      expiry: donation.expiry || null,
+      status: "active",
+    });
+    batch.update(donationRef, {
+      status: "redeemed",
+      redeemedBy: currentUid,
+      redeemedAt: serverTimestamp(),
+    });
 
-      await batch.commit();
-      onUpdate(donation.docId, { status: "redeemed", redeemedBy: currentUid });
-    } catch (e) {
-      console.error("Redeem failed:", e);
-      alert("Failed to redeem. Please try again.");
-    } finally {
-      setBusy(false);
-    }
-  };
+    console.log("Batch committing...");
+    await batch.commit();
+    console.log("Batch committed successfully.");
+
+    console.log("Creating notification...");
+    const notifRef = await addDoc(donorNotifsCol, {
+    type: "donation_redeemed",
+    title: "Your donation was redeemed",
+    body: `Someone has redeemed "${donation.name}".`,
+    donationId: donation.docId,
+    redeemedBy: currentUid,
+    redeemedAt: serverTimestamp(),
+    createdAt: serverTimestamp(),
+    read: false,
+    target: { route: "/my-donations", params: { highlight: donation.docId } },
+  });
+    console.log("Notification added at doc:", notifRef.path);
+    console.log("Notification added!");
+
+    onUpdate(donation.docId, { status: "redeemed", redeemedBy: currentUid });
+    alert("Redemption successful!");
+  } catch (e) {
+    console.error("Redeem failed:", e);
+    alert("Failed to redeem. Please try again.");
+  } finally {
+    setBusy(false);
+  }
+};
 
   const fmt = (d) => (d instanceof Date ? d.toLocaleDateString() : "—");
 
@@ -129,7 +144,7 @@ const AllDonationItemDetails = ({
         <h4 className="font-semibold">
           {donation.name}{" "}
           <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
-{isMine ? "Mine" : `by ${ownerName || "Anonymouss"}`}
+{isMine ? "Mine" : `by ${ownerName || "Anonymsouss"}`}
           </span>
           {isRedeemed && (
             <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">

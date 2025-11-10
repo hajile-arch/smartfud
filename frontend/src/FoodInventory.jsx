@@ -70,10 +70,10 @@ const FoodInventory = () => {
     const userDoc = await getDoc(doc(db, "users", user.uid));
     const userData = userDoc.data();
     // Extract first name (split by space)
-const firstName =
-  userData?.fullName?.split(" ")[0] ||
-  user.displayName?.split(" ")[0] ||
-  "Anonymous";
+    const firstName =
+      userData?.fullName?.split(" ")[0] ||
+      user.displayName?.split(" ")[0] ||
+      "Anonymosus";
 
 
 

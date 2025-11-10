@@ -11,6 +11,30 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
+			// Notifications: owner can read/manage; non-owner can create a
+			// *specific* notification only if they are the redeemer of a
+// donation that is already redeemed.
+match /notifications/{notifId} {
+  // Owner can read/update/delete their own notifications
+  allow read, update, delete: if isOwner(userId);
+
+  // Non-owner can *create* a donation_redeemed notification
+  allow create: if signedIn()
+    // only these fields are allowed
+    && request.resource.data.keys().hasOnly([
+      "type","title","body","donationId",
+      "redeemedBy","redeemedAt","createdAt","read","target"
+    ])
+    // shape/values must match what we expect
+    && request.resource.data.type == "donation_redeemed"
+    && request.resource.data.read == false
+    && request.resource.data.redeemedBy == request.auth.uid
+    // must refer to an existing donation...
+    && exists(/databases/$(database)/documents/users/$(userId)/donations/$(request.resource.data.donationId))
+    // ...that is already redeemed by this caller
+    && get(/databases/$(database)/documents/users/$(userId)/donations/$(request.resource.data.donationId)).data.status == "redeemed"
+    && get(/databases/$(database)/documents/users/$(userId)/donations/$(request.resource.data.donationId)).data.redeemedBy == request.auth.uid;
+}
 
       // Owner-only inventory
       match /inventory/{itemId} {
