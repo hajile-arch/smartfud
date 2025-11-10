@@ -131,6 +131,7 @@ const AllDonationItemDetails = ({
         fromUserId: donorUid,
         pickupLocation: donation.pickupLocation || "",
         availability: donation.availability || "",
+        category:donation.category,
         addedAt: serverTimestamp(),
         expiry: donation.expiry || null,
         status: "active",
@@ -156,7 +157,7 @@ const AllDonationItemDetails = ({
         createdAt: serverTimestamp(),
         read: false,
         target: {
-          route: "/my-donations",
+          route: "/all-donations",
           params: { highlight: donation.docId },
         },
       });
