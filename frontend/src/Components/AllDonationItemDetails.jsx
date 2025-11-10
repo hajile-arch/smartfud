@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   doc,
   updateDoc,
   deleteDoc,
+  getDoc,
   writeBatch,
   collection,
   addDoc,
@@ -97,82 +98,94 @@ const AllDonationItemDetails = ({
   };
 
   // Redeem others' donation -> copy to my inventory + mark donation redeemed
-  const handleRedeem = async () => {
-    console.log("Redeem start", donation.name);
-    if (!currentUid) return alert("Please sign in to redeem.");
-    if (isMine) return alert("You cannot redeem your own donation.");
-    if (isExpired || isRedeemed) return;
+ const handleRedeem = async () => {
+  console.log("Redeem start", donation.name);
+  if (!currentUid) return alert("Please sign in to redeem.");
+  if (isMine) return alert("You cannot redeem your own donation.");
+  if (isExpired || isRedeemed) return;
 
-    try {
-      setBusy(true);
+  try {
+    setBusy(true);
 
-      const donorUid = donation.userId;
-      console.log(
-        "donorUid for notification:",
-        donorUid,
-        "donationId:",
-        donation.docId
-      );
-      const donationRef = doc(
-        db,
-        "users",
-        donorUid,
-        "donations",
-        donation.docId
-      );
-      const invRef = doc(collection(db, "users", currentUid, "inventory"));
-      const donorNotifsCol = collection(db, "users", donorUid, "notifications");
+    const donorUid = donation.userId;
+    console.log(
+      "donorUid for notification:",
+      donorUid,
+      "donationId:",
+      donation.docId
+    );
 
-      const batch = writeBatch(db);
-      batch.set(invRef, {
-        name: donation.name,
-        quantity: Number(donation.quantity) || 0,
-        fromDonationId: donation.docId,
-        fromUserId: donorUid,
-        pickupLocation: donation.pickupLocation || "",
-        availability: donation.availability || "",
-        category:donation.category,
-        addedAt: serverTimestamp(),
-        expiry: donation.expiry || null,
-        status: "active",
-      });
-      batch.update(donationRef, {
-        status: "redeemed",
-        redeemedBy: currentUid,
-        redeemedAt: serverTimestamp(),
-      });
+    // ✅ Get redeemer’s name
+    const redeemerDoc = await getDoc(doc(db, "users", currentUid));
+    const redeemerData = redeemerDoc.exists() ? redeemerDoc.data() : {};
+    const redeemerName =
+      redeemerData.fullName ||
+      redeemerData.full_name ||
+      redeemerData.displayName ||
+      "Someone";
 
-      console.log("Batch committing...");
-      await batch.commit();
-      console.log("Batch committed successfully.");
+    const donationRef = doc(
+      db,
+      "users",
+      donorUid,
+      "donations",
+      donation.docId
+    );
+    const invRef = doc(collection(db, "users", currentUid, "inventory"));
+    const donorNotifsCol = collection(db, "users", donorUid, "notifications");
 
-      console.log("Creating notification...");
-      const notifRef = await addDoc(donorNotifsCol, {
-        type: "donation_redeemed",
-        title: "Your donation was redeemed",
-        body: `Someone has redeemed "${donation.name}".`,
-        donationId: donation.docId,
-        redeemedBy: currentUid,
-        redeemedAt: serverTimestamp(),
-        createdAt: serverTimestamp(),
-        read: false,
-        target: {
-          route: "/all-donations",
-          params: { highlight: donation.docId },
-        },
-      });
-      console.log("Notification added at doc:", notifRef.path);
-      console.log("Notification added!");
+    const batch = writeBatch(db);
+    batch.set(invRef, {
+      name: donation.name,
+      quantity: Number(donation.quantity) || 0,
+      fromDonationId: donation.docId,
+      fromUserId: donorUid,
+      pickupLocation: donation.pickupLocation || "",
+      availability: donation.availability || "",
+      category: donation.category,
+      addedAt: serverTimestamp(),
+      expiry: donation.expiry || null,
+      status: "active",
+    });
+    batch.update(donationRef, {
+      status: "redeemed",
+      redeemedBy: currentUid,
+      redeemedAt: serverTimestamp(),
+    });
 
-      onUpdate(donation.docId, { status: "redeemed", redeemedBy: currentUid });
-      alert("Redemption successful!");
-    } catch (e) {
-      console.error("Redeem failed:", e);
-      alert("Failed to redeem. Please try again.");
-    } finally {
-      setBusy(false);
-    }
-  };
+    console.log("Batch committing...");
+    await batch.commit();
+    console.log("Batch committed successfully.");
+
+    // ✅ Create notification with redeemer’s name
+    console.log("Creating notification...");
+    const notifRef = await addDoc(donorNotifsCol, {
+      type: "donation_redeemed",
+      title: "Your donation was redeemed",
+      body: `${redeemerName} has redeemed "${donation.name}".`,
+      donationId: donation.docId,
+      redeemedBy: currentUid,
+      redeemedAt: serverTimestamp(),
+      createdAt: serverTimestamp(),
+      read: false,
+      target: {
+        route: "/all-donations",
+        params: { highlight: donation.docId },
+      },
+    });
+    console.log("Notification added at doc:", notifRef.path);
+    console.log("Notification added!");
+
+    onUpdate(donation.docId, { status: "redeemed", redeemedBy: currentUid });
+    alert("Redemption successful!");
+  } catch (e) {
+    console.error("Redeem failed:", e);
+    alert("Failed to redeem. Please try again.");
+  } finally {
+    setBusy(false);
+  }
+};
+
 
   const fmt = (d) => (d instanceof Date ? d.toLocaleDateString() : "—");
 
