@@ -65,10 +65,24 @@ const FoodInventoryForm = ({
     }));
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onSubmit(formData, editingItem);
-  };
+const handleSubmit = (e) => {
+  e.preventDefault();
+  onSubmit(formData, editingItem);
+
+  // ✅ Reset fields after submission
+  setFormData({
+    name: "",
+    quantity: "",
+    expiry: "",
+    category: "",
+    location: "",
+    notes: "",
+  });
+
+  // ✅ Close modal after successful add/update
+  onClose();
+};
+
 
   const handleCancel = () => {
     setFormData({
