@@ -15,12 +15,10 @@ import ConvertDonationModal from "./Components/ConvertDonationModal";
 import DonationItemDetails from "./Components/DonationItemDetails";
 import { onAuthStateChanged } from "firebase/auth";
 import {
-  Plus,
   Edit,
   Trash2,
   Gift,
   Search,
-  Filter,
   Calendar,
   MapPin,
   Package,
@@ -57,62 +55,66 @@ const FoodInventory = () => {
 
   // Handler for modal confirmation
   const handleConfirmConversion = async () => {
-  if (!pickupLocation || !availability) {
-    alert("Please fill in all fields");
-    return;
-  }
+    if (!pickupLocation || !availability) {
+      alert("Please fill in all fields");
+      return;
+    }
 
-  try {
-    const user = auth.currentUser;
-    if (!user) return alert("You must be logged in.");
+    try {
+      const user = auth.currentUser;
+      if (!user) return alert("You must be logged in.");
 
-    // ✅ Get the user's Firestore data to access fullName
-    const userDoc = await getDoc(doc(db, "users", user.uid));
-    const userData = userDoc.data();
-    // Extract first name (split by space)
-   
-const fullName =
-  userData.fullName ||
-  userData.full_name ||
-  user.displayName ||
-  "Anonymous";
+      // ✅ Get the user's Firestore data to access fullName
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      const userData = userDoc.data();
+      // Extract first name (split by space)
 
-const firstName = fullName.split(" ")[0] || "Anonymous";
+      const fullName =
+        userData.fullName ||
+        userData.full_name ||
+        user.displayName ||
+        "Anonymous";
 
+      const firstName = fullName.split(" ")[0] || "Anonymous";
 
+      const donationData = {
+        ...selectedItem,
+        status: "donated",
+        pickupLocation,
+        availability,
+        contactInfo: user.email,
+        createdAt: new Date(),
 
-    const donationData = {
-      ...selectedItem,
-      status: "donated",
-      pickupLocation,
-      availability,
-      contactInfo: user.email,
-      createdAt: new Date(),
+        // ✅ Add donor info directly
+        ownerUid: user.uid,
+        ownerFullName: firstName,
+      };
 
-      // ✅ Add donor info directly
-      ownerUid: user.uid,
-ownerFullName: firstName,
-};
+      // Save donation
+      await addDoc(
+        collection(db, "users", user.uid, "donations"),
+        donationData
+      );
 
-    // Save donation
-    await addDoc(collection(db, "users", user.uid, "donations"), donationData);
+      // Update inventory and delete old doc
+      await updateDoc(
+        doc(db, "users", user.uid, "inventory", selectedItem.id),
+        {
+          status: "donated",
+          donatedAt: new Date(),
+        }
+      );
+      await deleteDoc(doc(db, "users", user.uid, "inventory", selectedItem.id));
 
-    // Update inventory and delete old doc
-    await updateDoc(doc(db, "users", user.uid, "inventory", selectedItem.id), {
-      status: "donated",
-      donatedAt: new Date(),
-    });
-    await deleteDoc(doc(db, "users", user.uid, "inventory", selectedItem.id));
-
-    setItems((prev) => prev.filter((item) => item.id !== selectedItem.id));
-    alert("Item successfully converted to donation!");
-    setShowConvertModal(false);
-    setSelectedItem(null);
-  } catch (error) {
-    console.error("Error converting item:", error);
-    alert("Error converting item. Please try again.");
-  }
-};
+      setItems((prev) => prev.filter((item) => item.id !== selectedItem.id));
+      alert("Item successfully converted to donation!");
+      setShowConvertModal(false);
+      setSelectedItem(null);
+    } catch (error) {
+      console.error("Error converting item:", error);
+      alert("Error converting item. Please try again.");
+    }
+  };
   // Check authentication
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -170,15 +172,6 @@ ownerFullName: firstName,
       unsubscribeDonations();
     };
   };
-
-  // Handle form input changes
-  // const handleInputChange = (e) => {
-  //   const { name, value } = e.target;
-  //   setFormData((prev) => ({
-  //     ...prev,
-  //     [name]: value,
-  //   }));
-  // };
 
   // Add or update item
   const handleSubmit = async (formData, editingItem) => {
@@ -262,33 +255,21 @@ ownerFullName: firstName,
   };
 
   // Filter items based on search and filters
-  const filteredItems = items.filter((item) => {
-    const matchesSearch = item.name
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase());
-    const matchesCategory =
-      categoryFilter === "all" || item.category === categoryFilter;
+  const passesFilters = (i) => {
+    const nameMatch = i.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const catMatch = categoryFilter === "all" || i.category === categoryFilter;
 
-    let matchesExpiry = true;
-    if (expiryFilter === "expiring") {
-      matchesExpiry = isExpiringSoon(item.expiry);
-    } else if (expiryFilter === "expired") {
-      matchesExpiry = isExpired(item.expiry);
-    } else if (expiryFilter === "safe") {
-      matchesExpiry = !isExpiringSoon(item.expiry) && !isExpired(item.expiry);
-    }
+    let expiryMatch = true;
+    if (expiryFilter === "expiring") expiryMatch = isExpiringSoon(i.expiry);
+    else if (expiryFilter === "expired") expiryMatch = isExpired(i.expiry);
+    else if (expiryFilter === "safe") expiryMatch = !isExpiringSoon(i.expiry) && !isExpired(i.expiry);
 
-    // Remove or modify the status check to include other statuses
-    // For example, include 'active' and 'donated'
-    return (
-      matchesSearch &&
-      matchesCategory &&
-      matchesExpiry &&
-      (item.status === "active" ||
-        item.status === "donated" ||
-        item.status === "planned")
-    );
-  });
+    return nameMatch && catMatch && expiryMatch;
+  };
+  const activeStatuses = ["active", "planned", "donated"];
+  const activeItems = items.filter((i) => activeStatuses.includes(i.status) && passesFilters(i));
+  const usedItems = items.filter((i) => i.status === "used" && passesFilters(i));
+
 
   if (loading) {
     return (
@@ -383,155 +364,231 @@ ownerFullName: firstName,
       />
 
       {/* Inventory List */}
-      <div className="bg-white rounded-lg shadow-md">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Food Items ({filteredItems.length})
-          </h2>
-        </div>
+     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+  {/* LEFT: ACTIVE / PLANNED / DONATED */}
+  <div className="bg-white rounded-lg shadow-md">
+    <div className="px-6 py-4 border-b border-gray-200">
+      <h2 className="text-lg font-semibold">Food Items ({activeItems.length})</h2>
+    </div>
 
-        {filteredItems.length === 0 ? (
-          <div className="text-center py-12">
-            <Package className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">
-              No food items
-            </h3>
-            <p className="mt-1 text-sm text-gray-500">
-              {searchTerm || categoryFilter !== "all" || expiryFilter !== "all"
-                ? "No items match your filters."
-                : "Get started by adding your first food item."}
-            </p>
-          </div>
-        ) : (
-          <div className="divide-y divide-gray-200">
-            {filteredItems.map((item) => (
-              <div key={item.id} className="px-6 py-4 hover:bg-gray-50">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div
-                      className={`p-2 rounded-lg ${
-                        isExpired(item.expiry)
-                          ? "bg-red-100"
-                          : isExpiringSoon(item.expiry)
-                          ? "bg-orange-100"
-                          : "bg-green-100"
-                      }`}
-                    >
-                      <Utensils
-                        className={`h-5 w-5 ${
-                          isExpired(item.expiry)
-                            ? "text-red-600"
-                            : isExpiringSoon(item.expiry)
-                            ? "text-orange-600"
-                            : "text-green-600"
-                        }`}
-                      />
-                    </div>
-
-                    <div>
-                      <h3 className="text-lg font-medium text-gray-900">
-                        {item.name}
-                      </h3>
-                      <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
-                        <span className="flex items-center">
-                          <Package className="h-4 w-4 mr-1" />
-                          {item.quantity} units
-                        </span>
-                        <span className="flex items-center">
-                          <Calendar className="h-4 w-4 mr-1" />
-                          {item.expiry.toLocaleDateString()}
-                        </span>
-                        <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
-                          {item.category}
-                        </span>
-                        {item.location && (
-                          <span className="flex items-center">
-                            <MapPin className="h-4 w-4 mr-1" />
-                            {item.location}
-                          </span>
-                        )}
-                      </div>
-                      {item.notes && (
-                        <p className="text-sm text-gray-600 mt-1">
-                          {item.notes}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    {!isExpired(item.expiry) && (
-                      <button
-                        onClick={() => handleOpenConvertModal(item)}
-                        className="bg-green-500 text-white p-2 rounded-md hover:bg-green-600"
-                        title="Convert to Donation"
-                      >
-                        <Gift className="h-4 w-4" />
-                      </button>
-                    )}
-
-                    <button
-                      onClick={() => handleEdit(item)}
-                      className="bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600"
-                      title="Edit Item"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </button>
-
-                    <button
-                      onClick={() => handleDelete(item.id)}
-                      className="bg-red-500 text-white p-2 rounded-md hover:bg-red-600"
-                      title="Delete Item"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
+    {activeItems.length === 0 ? (
+      <div className="text-center py-12">
+        <Package className="mx-auto h-12 w-12 text-gray-400" />
+        <h3 className="mt-2 text-sm font-medium">No active items</h3>
+      </div>
+    ) : (
+      <div className="divide-y divide-gray-200">
+        {activeItems.map((item) => (
+          <div key={item.id} className="px-6 py-4 hover:bg-gray-50">
+            <div className="flex items-center justify-between">
+              {/* LEFT info (with coloured icon tile) */}
+              <div className="flex items-center space-x-4">
+                <div
+                  className={`p-2 rounded-lg ${
+                    isExpired(item.expiry)
+                      ? "bg-red-100"
+                      : isExpiringSoon(item.expiry)
+                      ? "bg-orange-100"
+                      : "bg-green-100"
+                  }`}
+                >
+                  <Utensils
+                    className={`h-5 w-5 ${
+                      isExpired(item.expiry)
+                        ? "text-red-600"
+                        : isExpiringSoon(item.expiry)
+                        ? "text-orange-600"
+                        : "text-green-600"
+                    }`}
+                  />
                 </div>
 
-                {/* Expiry Warning */}
-                {isExpired(item.expiry) && (
-                  <div className="mt-2 flex items-center text-red-600 text-sm">
-                    <AlertTriangle className="h-4 w-4 mr-1" />
-                    This item has expired. Please dispose of it safely.
-                  </div>
-                )}
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900 flex items-center gap-2">
+                    {item.name}
+                    {item.status && (
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded-full ${
+                          item.status === "used"
+                            ? "bg-gray-300 text-gray-700"
+                            : item.status === "donated"
+                            ? "bg-blue-100 text-blue-700"
+                            : item.status === "planned"
+                            ? "bg-yellow-100 text-yellow-700"
+                            : "bg-green-100 text-green-700"
+                        }`}
+                      >
+                        {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                      </span>
+                    )}
+                  </h3>
 
-                {isExpiringSoon(item.expiry) && !isExpired(item.expiry) && (
-                  <div className="mt-2 flex items-center text-orange-600 text-sm">
-                    <Clock className="h-4 w-4 mr-1" />
-                    This item is expiring soon. Consider donating it.
+                  <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600 mt-1">
+                    <span className="flex items-center">
+                      <Package className="h-4 w-4 mr-1" />
+                      {item.quantity} units
+                    </span>
+                    <span className="flex items-center">
+                      <Calendar className="h-4 w-4 mr-1" />
+                      {item.expiry instanceof Date
+                        ? item.expiry.toLocaleDateString()
+                        : new Date(item.expiry).toLocaleDateString()}
+                    </span>
+                    {item.category && (
+                      <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
+                        {item.category}
+                      </span>
+                    )}
+                    {item.location && (
+                      <span className="flex items-center">
+                        <MapPin className="h-4 w-4 mr-1" />
+                        {item.location}
+                      </span>
+                    )}
                   </div>
+
+                  {item.notes && (
+                    <p className="text-sm text-gray-600 mt-1">{item.notes}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* RIGHT actions */}
+              <div className="flex items-center gap-2">
+                {!isExpired(item.expiry) && (
+                  <button
+                    onClick={() => handleOpenConvertModal(item)}
+                    className="bg-green-500 text-white p-2 rounded-md hover:bg-green-600"
+                    title="Convert to Donation"
+                  >
+                    <Gift className="h-4 w-4" />
+                  </button>
+                )}
+                <button
+                  onClick={() => handleEdit(item)}
+                  className="bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600"
+                  title="Edit Item"
+                >
+                  <Edit className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => handleDelete(item.id)}
+                  className="bg-red-500 text-white p-2 rounded-md hover:bg-red-600"
+                  title="Delete Item"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Warnings under the row */}
+            {isExpired(item.expiry) && (
+              <div className="mt-2 flex items-center text-red-600 text-sm">
+                <AlertTriangle className="h-4 w-4 mr-1" />
+                This item has expired. Please dispose of it safely.
+              </div>
+            )}
+            {isExpiringSoon(item.expiry) && !isExpired(item.expiry) && (
+              <div className="mt-2 flex items-center text-orange-600 text-sm">
+                <Clock className="h-4 w-4 mr-1" />
+                This item is expiring soon. Consider donating it.
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+
+  {/* RIGHT: USED (read-only except delete) */}
+  <div className="bg-white rounded-lg shadow-md">
+    <div className="px-6 py-4 border-b border-gray-200 flex justify-between">
+      <h2 className="text-lg font-semibold">Used Items ({usedItems.length})</h2>
+      <span className="text-xs text-gray-500">Read-only, delete only</span>
+    </div>
+
+    {usedItems.length === 0 ? (
+      <div className="text-center py-12">
+        <Package className="mx-auto h-12 w-12 text-gray-400" />
+        <h3 className="mt-2 text-sm font-medium">No used items</h3>
+      </div>
+    ) : (
+      <div className="divide-y divide-gray-200">
+        {usedItems.map((item) => (
+          <div
+            key={item.id}
+            className="px-6 py-4 hover:bg-gray-50 opacity-75 flex items-center justify-between"
+          >
+            <div className="flex items-center space-x-4">
+              <div className="p-2 rounded-lg bg-gray-100">
+                <Utensils className="h-5 w-5 text-gray-500" />
+              </div>
+              <div>
+                <h3 className="text-lg font-medium text-gray-700 flex items-center gap-2">
+                  {item.name}
+                  <span className="bg-gray-200 text-gray-700 text-xs px-2 py-0.5 rounded-full">
+                    Used
+                  </span>
+                </h3>
+                <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500 mt-1">
+                  <span className="flex items-center">
+                    <Package className="h-4 w-4 mr-1" />
+                    {item.quantity} units
+                  </span>
+                  <span className="flex items-center">
+                    <Calendar className="h-4 w-4 mr-1" />
+                    {item.expiry instanceof Date
+                      ? item.expiry.toLocaleDateString()
+                      : new Date(item.expiry).toLocaleDateString()}
+                  </span>
+                  {item.category && (
+                    <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs">
+                      {item.category}
+                    </span>
+                  )}
+                </div>
+                {item.notes && (
+                  <p className="text-sm text-gray-500 mt-1">{item.notes}</p>
                 )}
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+            </div>
 
-      {/* Donations Section */}
+            <button
+              onClick={() => handleDelete(item.id)}
+              className="bg-red-500 text-white p-2 rounded-md hover:bg-red-600"
+              title="Delete used item"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+</div>
+
+
+      {/* Donations */}
       {donations.length > 0 && (
         <div className="mt-8 bg-white rounded-lg shadow-md">
           <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">
+            <h2 className="text-lg font-semibold">
               Donation Listings ({donations.length})
             </h2>
           </div>
-
           <div className="divide-y divide-gray-200">
-            {donations.map((donation) => (
+            {donations.map((d) => (
               <DonationItemDetails
-                key={donation.docId}
-                donation={donation}
-                onDelete={(id) => {
-                  setDonations((prev) => prev.filter((d) => d.docId !== id));
-                }}
-                onUpdate={(id, updatedData) => {
-                  setDonations((prev) =>
-                    prev.map((d) =>
-                      d.docId === id ? { ...d, ...updatedData } : d
-                    )
-                  );
-                }}
+                key={d.docId}
+                donation={d}
+                onDelete={(id) =>
+                  setDonations((p) => p.filter((x) => x.docId !== id))
+                }
+                onUpdate={(id, u) =>
+                  setDonations((p) =>
+                    p.map((x) => (x.docId === id ? { ...x, ...u } : x))
+                  )
+                }
               />
             ))}
           </div>
