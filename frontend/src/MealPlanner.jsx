@@ -53,8 +53,8 @@ function weekKeyOf(date) {
 }
 
 export default function MealPlanner({ user }) {
-  const todayStr = new Date().toISOString().split('T')[0];
- const [notification, setNotification] = useState(null);
+  const todayStr = new Date().toISOString().split("T")[0];
+  const [notification, setNotification] = useState(null);
   const [showNotification, setShowNotification] = useState(false);
   const [anchorDate, setAnchorDate] = useState(startOfWeek(new Date()));
   const [inventory, setInventory] = useState([]);
@@ -121,22 +121,8 @@ export default function MealPlanner({ user }) {
     },
   ];
 
-// const daysUntil = (d) => {
-//   if (!d) return Infinity;
-//   const t = new Date().setHours(0,0,0,0);
-//   const x = new Date(d).setHours(0,0,0,0);
-//   return Math.ceil((x - t) / 86400000);
-// };
-// const expiryTone = (d) => {
-//   const n = daysUntil(d);
-//   if (n === Infinity) return "bg-gray-100 text-gray-700 border-gray-200";
-//   if (n < 0) return "bg-rose-100 text-rose-800 border-rose-200";
-//   if (n <= 3) return "bg-amber-100 text-amber-800 border-amber-200";
-//   return "bg-emerald-100 text-emerald-800 border-emerald-200";
-// };
-
-    // Function to show a notification
-  const showToast = (message, type = 'error') => {
+  // Function to show a notification
+  const showToast = (message, type = "error") => {
     setNotification({ message, type });
     setShowNotification(true);
 
@@ -281,13 +267,19 @@ export default function MealPlanner({ user }) {
       });
     });
 
-    // Notifications (use batch.set with generated ids)
+    // === Notifications: upsert per (date, slot) and delete cleared ones ===
     for (const day of weekDays) {
       const dStr = ymd(day);
       for (const slot of SLOT_KEYS) {
         const key = `${dStr}:${slot}`;
         const entry = plan[key];
-        if (!entry?.title) continue;
+        const notifId = `meal_${dStr}_${slot}`; // deterministic ID
+
+        if (!entry?.title) {
+          // slot cleared -> delete any existing notif for this slot
+          batch.delete(doc(db, "users", user.uid, "notifications", notifId));
+          continue;
+        }
 
         const reminderAt = new Date(day);
         if (slot === "breakfast") reminderAt.setHours(8, 0, 0, 0);
@@ -295,18 +287,24 @@ export default function MealPlanner({ user }) {
         else if (slot === "dinner") reminderAt.setHours(18, 0, 0, 0);
         else reminderAt.setHours(16, 0, 0, 0);
 
-        const notifRef = doc(
-          collection(db, "users", user.uid, "notifications")
+        // Upsert (prevents duplicates on every Save)
+        batch.set(
+          doc(db, "users", user.uid, "notifications", notifId),
+          {
+            type: "meal",
+            weekKey, // handy for debugging/cleanup
+            slot, // "breakfast" | "lunch" | "dinner" | "snack"
+            date: dStr, // "YYYY-MM-DD"
+            title: `Reminder: ${slot} — ${entry.title}`,
+            body: entry.note || "Tap to view your plan.",
+            createdAt: serverTimestamp(), // first write keeps earliest value
+            updatedAt: serverTimestamp(), // track last save
+            read: false,
+            target: { route: "/meal-planner", params: { date: dStr, slot } },
+            reminderAt,
+          },
+          { merge: true } // <= important: upsert instead of create
         );
-        batch.set(notifRef, {
-          type: "meal",
-          title: `Reminder: ${slot} — ${entry.title}`,
-          body: entry.note || "Tap to view your plan.",
-          createdAt: serverTimestamp(),
-          read: false,
-          target: { route: "/meal-planner", params: { date: dStr, slot } },
-          reminderAt,
-        });
       }
     }
 
@@ -320,48 +318,48 @@ export default function MealPlanner({ user }) {
 
   // Add recipe to plan
   const handleAddRecipe = (recipe) => {
-  const missingIngredients = [];
+    const missingIngredients = [];
 
-  recipe.ingredients.forEach((ing) => {
-    const inventoryItem = inventory.find(
-      (item) => item.name.toLowerCase() === ing.name.toLowerCase()
-    );
-    if (!inventoryItem || inventoryItem.quantity < ing.quantity) {
-      missingIngredients.push({
-        name: ing.name,
-        required: ing.quantity,
-        available: inventoryItem?.quantity || 0,
-      });
-    }
-  });
-
-  if (missingIngredients.length > 0) {
-    // Show a quick toast
-    showToast('Missing ingredients for this recipe.', 'error');
-
-    // Also show detailed missing ingredients in notification
-    setNotification({
-      type: "error",
-      message: (
-        <div>
-          <p className="font-semibold mb-2">Missing ingredients:</p>
-          <ul className="list-inside list-disc text-sm">
-            {missingIngredients.map((ing, index) => (
-              <li key={index}>
-                {ing.name}: need {ing.required}, available {ing.available}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ),
+    recipe.ingredients.forEach((ing) => {
+      const inventoryItem = inventory.find(
+        (item) => item.name.toLowerCase() === ing.name.toLowerCase()
+      );
+      if (!inventoryItem || inventoryItem.quantity < ing.quantity) {
+        missingIngredients.push({
+          name: ing.name,
+          required: ing.quantity,
+          available: inventoryItem?.quantity || 0,
+        });
+      }
     });
-    return;
-  }
 
-  // If all ingredients are available, proceed
-  setTempRecipe(recipe);
-  setShowDateMealModal(true);
-};
+    if (missingIngredients.length > 0) {
+      // Show a quick toast
+      showToast("Missing ingredients for this recipe.", "error");
+
+      // Also show detailed missing ingredients in notification
+      setNotification({
+        type: "error",
+        message: (
+          <div>
+            <p className="font-semibold mb-2">Missing ingredients:</p>
+            <ul className="list-inside list-disc text-sm">
+              {missingIngredients.map((ing, index) => (
+                <li key={index}>
+                  {ing.name}: need {ing.required}, available {ing.available}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ),
+      });
+      return;
+    }
+
+    // If all ingredients are available, proceed
+    setTempRecipe(recipe);
+    setShowDateMealModal(true);
+  };
   const handleConfirmDateMeal = (date, meal) => {
     if (tempRecipe) {
       const key = `${date}:${meal}`;
@@ -424,8 +422,8 @@ export default function MealPlanner({ user }) {
       {notification && (
         <div
           className={`fixed top-4 right-4 max-w-sm w-full p-4 rounded-lg shadow-lg z-50 transition-opacity duration-500 ${
-            showNotification ? 'opacity-100' : 'opacity-0'
-          } ${notification.type === 'error' ? 'bg-red-500 text-white' : ''}`}
+            showNotification ? "opacity-100" : "opacity-0"
+          } ${notification.type === "error" ? "bg-red-500 text-white" : ""}`}
           onTransitionEnd={handleTransitionEnd}
         >
           <div className="flex items-start space-x-2">
@@ -471,11 +469,10 @@ export default function MealPlanner({ user }) {
       </div>
 
       <InventoryGrid
-  inventory={inventory}
-  title="Inventory Items"
-  hint="“Planned” items are highlighted"
-/>
-
+        inventory={inventory}
+        title="Inventory Items"
+        hint="“Planned” items are highlighted"
+      />
 
       {/* --- Basic Recipes --- */}
       <BasicRecipes
@@ -485,16 +482,16 @@ export default function MealPlanner({ user }) {
 
       {/* Weekly Meal Plan Grid */}
       <WeeklyMealPlanGrid
-      plan={plan}
-      weekDays={weekDays}
-      ymd={ymd}
-      SLOT_KEYS={SLOT_KEYS}
-      setTitle={setTitle}
-      openAdd={openAdd}
-      setNote={setNote}
-      clearSlot={clearSlot}
-      currentDateStr={todayStr}
-    />
+        plan={plan}
+        weekDays={weekDays}
+        ymd={ymd}
+        SLOT_KEYS={SLOT_KEYS}
+        setTitle={setTitle}
+        openAdd={openAdd}
+        setNote={setNote}
+        clearSlot={clearSlot}
+        currentDateStr={todayStr}
+      />
 
       {/* Ingredient Picker Modal */}
       <IngredientPickerModal
