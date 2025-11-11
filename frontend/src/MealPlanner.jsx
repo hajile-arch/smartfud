@@ -12,10 +12,10 @@ import {
   doc,
 } from "firebase/firestore";
 import { db } from "../firebase";
+import InventoryGrid from "./Components/InventoryGrid"; // adjust path if not using alias
 import IngredientPickerModal from "./Components/IngredientPickerModal";
 import BasicRecipes from "./Components/BasicRecipes";
 import WeeklyMealPlanGrid from "./Components/WeeklyMealPlanGrid";
-import { Utensils, Calendar, MapPin, Package } from "lucide-react";
 import DateMealPickerModal from "./Components/DateMealPickerModal"; // Adjust path as needed
 
 const SLOT_KEYS = ["breakfast", "lunch", "dinner", "snack"];
@@ -121,19 +121,19 @@ export default function MealPlanner({ user }) {
     },
   ];
 
-const daysUntil = (d) => {
-  if (!d) return Infinity;
-  const t = new Date().setHours(0,0,0,0);
-  const x = new Date(d).setHours(0,0,0,0);
-  return Math.ceil((x - t) / 86400000);
-};
-const expiryTone = (d) => {
-  const n = daysUntil(d);
-  if (n === Infinity) return "bg-gray-100 text-gray-700 border-gray-200";
-  if (n < 0) return "bg-rose-100 text-rose-800 border-rose-200";
-  if (n <= 3) return "bg-amber-100 text-amber-800 border-amber-200";
-  return "bg-emerald-100 text-emerald-800 border-emerald-200";
-};
+// const daysUntil = (d) => {
+//   if (!d) return Infinity;
+//   const t = new Date().setHours(0,0,0,0);
+//   const x = new Date(d).setHours(0,0,0,0);
+//   return Math.ceil((x - t) / 86400000);
+// };
+// const expiryTone = (d) => {
+//   const n = daysUntil(d);
+//   if (n === Infinity) return "bg-gray-100 text-gray-700 border-gray-200";
+//   if (n < 0) return "bg-rose-100 text-rose-800 border-rose-200";
+//   if (n <= 3) return "bg-amber-100 text-amber-800 border-amber-200";
+//   return "bg-emerald-100 text-emerald-800 border-emerald-200";
+// };
 
     // Function to show a notification
   const showToast = (message, type = 'error') => {
@@ -470,133 +470,11 @@ const expiryTone = (d) => {
         </div>
       </div>
 
-      {/* Inventory suggestions */}
-      {/* Inventory */}
-<div className="bg-white rounded-2xl shadow-sm p-6">
-  <div className="flex items-center justify-between mb-4">
-    <div className="flex items-center gap-2">
-      <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-100">
-        <Package className="h-4 w-4 text-slate-700" />
-      </span>
-      <h2 className="text-lg font-semibold">Inventory Items</h2>
-      <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
-        {inventory.length}
-      </span>
-    </div>
-    {/* optional hint */}
-    <span className="text-xs text-gray-500">“Planned” items are highlighted</span>
-  </div>
-
-  {inventory.length === 0 ? (
-    <div className="rounded-xl border border-dashed border-gray-300 p-10 text-center">
-      <p className="text-sm text-gray-600">No inventory items loaded.</p>
-    </div>
-  ) : (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {inventory
-        .slice()
-        .sort((a, b) => (a.status === "planned" ? -1 : 0) - (b.status === "planned" ? -1 : 0))
-        .map((item) => {
-          const reserved = Number(item.reserved || 0);
-          const qty = Number(item.quantity || 0);
-          const available = Math.max(0, qty - reserved);
-          const pct = qty > 0 ? Math.min(100, Math.round((reserved / qty) * 100)) : 0;
-
-          return (
-            <div
-              key={item.id}
-              className={[
-                "group relative overflow-hidden rounded-xl border transition shadow-sm hover:shadow-md",
-                item.status === "planned"
-                  ? "border-blue-200 bg-gradient-to-b from-white to-blue-50/60"
-                  : "border-gray-200 bg-white"
-              ].join(" ")}
-            >
-              {/* subtle corner bubble */}
-              {item.status === "planned" && (
-                <div className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-blue-100 opacity-60" />
-              )}
-
-              <div className="relative z-10 p-4">
-                {/* Header row */}
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <Utensils className="h-4 w-4 text-slate-500" />
-                      <div className="font-medium truncate">{item.name}</div>
-                    </div>
-                    <div className="mt-1 text-xs text-gray-500 flex items-center gap-3">
-                      <span className="inline-flex items-center gap-1">
-                        <Package className="h-3.5 w-3.5" />
-                        Qty: <span className="font-medium text-gray-700">{qty}</span>
-                      </span>
-                      {item.location && (
-                        <span className="inline-flex items-center gap-1">
-                          <MapPin className="h-3.5 w-3.5" />
-                          {item.location}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Status chip */}
-                  <span
-                    className={[
-                      "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium border",
-                      item.status === "planned"
-                        ? "bg-blue-100 text-blue-800 border-blue-200"
-                        : item.status === "used"
-                        ? "bg-emerald-100 text-emerald-800 border-emerald-200"
-                        : item.status === "donated"
-                        ? "bg-purple-100 text-purple-800 border-purple-200"
-                        : "bg-slate-100 text-slate-700 border-slate-200"
-                    ].join(" ")}
-                    title={`Status: ${item.status}`}
-                  >
-                    {item.status}
-                  </span>
-                </div>
-
-                {/* Expiry chip */}
-                <div className="mt-3">
-                  <span
-                    className={[
-                      "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px]",
-                      expiryTone(item.expiry)
-                    ].join(" ")}
-                  >
-                    <Calendar className="h-3.5 w-3.5" />
-                    {item.expiry
-                      ? `Exp: ${new Date(item.expiry).toLocaleDateString()}`
-                      : "No expiry"}
-                  </span>
-                </div>
-
-                {/* Reserved/Available bar */}
-                <div className="mt-3">
-                  <div className="flex justify-between text-[11px] text-gray-600 mb-1">
-                    <span>Reserved</span>
-                    <span>
-                      {reserved}/{qty} ({pct}%)
-                    </span>
-                  </div>
-                  <div className="h-2 w-full rounded-full bg-gray-100 overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-blue-500 transition-[width] duration-300"
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                  <div className="mt-1 text-[11px] text-gray-600">
-                    Available: <span className="font-medium text-gray-800">{available}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-    </div>
-  )}
-</div>
+      <InventoryGrid
+  inventory={inventory}
+  title="Inventory Items"
+  hint="“Planned” items are highlighted"
+/>
 
 
       {/* --- Basic Recipes --- */}
