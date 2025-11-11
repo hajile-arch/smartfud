@@ -209,18 +209,24 @@ export default function MealPlanner({ user }) {
     setModalOpen(false);
   };
 
-  const setTitle = (key) => {
-    const current = plan[key]?.title || "";
-    const title = prompt("Meal title:", current);
-    if (title === null) return;
-    setPlan((prev) => ({ ...prev, [key]: { ...(prev[key] || {}), title } }));
+  // New: child passes the value directly
+  const setTitle = (key, value) => {
+    const title = (value || "").trim();
+    if (!title) return;
+    setPlan((prev) => ({
+      ...prev,
+      [key]: { ...(prev[key] || {}), title },
+    }));
   };
-  const setNote = (key) => {
-    const current = plan[key]?.note || "";
-    const note = prompt("Notes / recipe URL:", current);
-    if (note === null) return;
-    setPlan((prev) => ({ ...prev, [key]: { ...(prev[key] || {}), note } }));
+
+  const setNote = (key, value) => {
+    const note = (value || "").trim();
+    setPlan((prev) => ({
+      ...prev,
+      [key]: { ...(prev[key] || {}), note },
+    }));
   };
+
   const clearSlot = (key) => {
     setPlan((prev) => {
       const next = { ...prev };
@@ -486,9 +492,9 @@ export default function MealPlanner({ user }) {
         weekDays={weekDays}
         ymd={ymd}
         SLOT_KEYS={SLOT_KEYS}
-        setTitle={setTitle}
+        setTitle={setTitle} // now (key, value)
         openAdd={openAdd}
-        setNote={setNote}
+        setNote={setNote} // now (key, value)
         clearSlot={clearSlot}
         currentDateStr={todayStr}
       />
