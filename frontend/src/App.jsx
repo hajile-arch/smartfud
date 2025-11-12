@@ -62,11 +62,14 @@ export default function App() {
                 >
                   Meal Plans
                 </Link>
+                <Link 
+                  to="/all-donations" 
+                  className="hover:text-blue-600 transition"
+                >
+                  Donations
+                </Link>
               </>
             )}
-            <Link to="/all-donations" className="hover:text-blue-600 transition">
-              Donations
-            </Link>
           </div>
 
           {/* Right side - auth + bell */}
@@ -150,8 +153,8 @@ export default function App() {
                       className="border border-blue-600 text-blue-600 px-6 py-2 rounded-lg hover:bg-blue-50 transition"
                     >
                       Meal Plans
-                      Meal Plans
                     </Link>
+                    
                   </>
                 )}
               </div>
@@ -166,7 +169,14 @@ export default function App() {
             </PrivateRoute>
           }
         />
-        <Route path="/all-donations" element={<AllDonationsPage />} />
+        <Route
+          path="/all-donations"
+          element={
+            <PrivateRoute user={user}>
+              <AllDonationsPage />
+            </PrivateRoute>
+          }
+        />
         <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
         <Route path="/verify" element={<Verify />} />
