@@ -147,7 +147,7 @@ export default function MealPlanner({ user }) {
       where("status", "in", ["active", "planned"])
     );
     const unsubscribe = onSnapshot(qInv, (snap) => {
-      const items = snap.docs.map((d) => {
+      const itemsRaw = snap.docs.map((d) => {
         const x = d.data();
         return {
           id: d.id,
@@ -160,15 +160,27 @@ export default function MealPlanner({ user }) {
           location: x.location || "",
         };
       });
-      items.sort((a, b) => {
-        const ax = a.expiry
-          ? new Date(a.expiry).getTime()
-          : Number.POSITIVE_INFINITY;
-        const bx = b.expiry
-          ? new Date(b.expiry).getTime()
-          : Number.POSITIVE_INFINITY;
-        return ax - bx;
-      });
+      const isExpired = (v) => {
+        if (!v) return false; // no expiry: treat as not expired
+        const d = v instanceof Date ? v : new Date(v);
+        if (Number.isNaN(d.getTime())) return false;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const dd = new Date(d);
+        dd.setHours(0, 0, 0, 0);
+        return dd < today;
+      };
+      const items = itemsRaw
+        .filter((it) => !isExpired(it.expiry)) // HIDE expired items
+        .sort((a, b) => {
+          const ax = a.expiry
+            ? new Date(a.expiry).getTime()
+            : Number.POSITIVE_INFINITY;
+          const bx = b.expiry
+            ? new Date(b.expiry).getTime()
+            : Number.POSITIVE_INFINITY;
+          return ax - bx;
+        });
       setInventory(items);
     });
     return () => unsubscribe();
