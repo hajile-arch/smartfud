@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { doc, updateDoc, deleteDoc } from "firebase/firestore";
-import { db } from "../../firebase"; // adjust path as needed
-import { X, Edit, Trash2 } from "lucide-react";
+import { db } from "../../firebase";
+import { X, Edit, Trash2, CheckCircle } from "lucide-react";
 
 const DonationItemDetails = ({ donation, onDelete, onUpdate }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -12,6 +12,8 @@ const DonationItemDetails = ({ donation, onDelete, onUpdate }) => {
     pickupLocation: donation.pickupLocation || "",
     availability: donation.availability || "",
   });
+
+  const isRedeemed = donation.status === "redeemed"; // ✅ detect redeemed state
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -41,6 +43,7 @@ const DonationItemDetails = ({ donation, onDelete, onUpdate }) => {
   };
 
   const handleDelete = async () => {
+    if (isRedeemed) return; // ✅ block deletion of redeemed
     if (window.confirm("Are you sure you want to delete this donation?")) {
       try {
         const donationRef = doc(db, "users", donation.userId, "donations", donation.docId);
@@ -54,8 +57,12 @@ const DonationItemDetails = ({ donation, onDelete, onUpdate }) => {
   };
 
   return (
-    <div className="border p-4 rounded-lg mb-4 shadow-sm">
-      {isEditing ? (
+    <div
+      className={`border p-4 rounded-lg mb-4 shadow-sm ${
+        isRedeemed ? "bg-green-50 border-green-300 opacity-90" : ""
+      }`}
+    >
+      {isEditing && !isRedeemed ? (
         <div>
           <div className="flex justify-between items-center mb-2">
             <h4 className="font-semibold">Edit Donation</h4>
@@ -66,90 +73,101 @@ const DonationItemDetails = ({ donation, onDelete, onUpdate }) => {
               <X className="w-4 h-4" />
             </button>
           </div>
-          
-          {/* Editable form fields */}
+
           <div className="space-y-2">
-  {/* Name */}
-  <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-  <input
-    type="text"
-    name="name"
-    placeholder="Name"
-    value={formData.name}
-    onChange={handleChange}
-    className="w-full border border-gray-300 rounded px-2 py-1"
-  />
+            {/* Name */}
+            <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+            <input
+              type="text"
+              name="name"
+              placeholder="Name"
+              value={formData.name}
+              onChange={handleChange}
+              className="w-full border border-gray-300 rounded px-2 py-1"
+            />
 
-  {/* Quantity */}
-  <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
-  <input
-    type="number"
-    name="quantity"
-    placeholder="Quantity"
-    value={formData.quantity}
-    onChange={handleChange}
-    className="w-full border border-gray-300 rounded px-2 py-1"
-  />
+            {/* Quantity */}
+            <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+            <input
+              type="number"
+              name="quantity"
+              placeholder="Quantity"
+              value={formData.quantity}
+              onChange={handleChange}
+              className="w-full border border-gray-300 rounded px-2 py-1"
+            />
 
-  {/* Expiry Date */}
-  <label className="block text-sm font-medium text-gray-700 mb-1">Expiry Date</label>
-  <input
-    type="date"
-    name="expiry"
-    value={formData.expiry}
-    onChange={handleChange}
-    className="w-full border border-gray-300 rounded px-2 py-1"
-  />
+            {/* Expiry Date */}
+            <label className="block text-sm font-medium text-gray-700 mb-1">Expiry Date</label>
+            <input
+              type="date"
+              name="expiry"
+              value={formData.expiry}
+              onChange={handleChange}
+              className="w-full border border-gray-300 rounded px-2 py-1"
+            />
 
-  {/* Pickup Location */}
-  <label className="block text-sm font-medium text-gray-700 mb-1">Pickup Location</label>
-  <input
-    type="text"
-    name="pickupLocation"
-    placeholder="Pickup Location"
-    value={formData.pickupLocation}
-    onChange={handleChange}
-    className="w-full border border-gray-300 rounded px-2 py-1"
-  />
+            {/* Pickup Location */}
+            <label className="block text-sm font-medium text-gray-700 mb-1">Pickup Location</label>
+            <input
+              type="text"
+              name="pickupLocation"
+              placeholder="Pickup Location"
+              value={formData.pickupLocation}
+              onChange={handleChange}
+              className="w-full border border-gray-300 rounded px-2 py-1"
+            />
 
-  {/* Availability */}
-  <label className="block text-sm font-medium text-gray-700 mb-1">Availability</label>
-  <input
-    type="text"
-    name="availability"
-    placeholder="Availability"
-    value={formData.availability}
-    onChange={handleChange}
-    className="w-full border border-gray-300 rounded px-2 py-1"
-  />
+            {/* Availability */}
+            <label className="block text-sm font-medium text-gray-700 mb-1">Availability</label>
+            <input
+              type="text"
+              name="availability"
+              placeholder="Availability"
+              value={formData.availability}
+              onChange={handleChange}
+              className="w-full border border-gray-300 rounded px-2 py-1"
+            />
 
-  {/* Save and cancel buttons */}
-  <div className="flex space-x-2 mt-2">
-    <button
-      onClick={handleSave}
-      className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600"
-    >
-      Save
-    </button>
-    <button
-      onClick={() => setIsEditing(false)}
-      className="bg-gray-200 text-gray-700 px-3 py-1 rounded hover:bg-gray-300"
-    >
-      Cancel
-    </button>
-  </div>
-</div>
+            {/* Save & Cancel */}
+            <div className="flex space-x-2 mt-2">
+              <button
+                onClick={handleSave}
+                className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600"
+              >
+                Save
+              </button>
+              <button
+                onClick={() => setIsEditing(false)}
+                className="bg-gray-200 text-gray-700 px-3 py-1 rounded hover:bg-gray-300"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       ) : (
         <div>
-          {/* Display details */}
+          {/* Header */}
           <div className="flex justify-between items-center mb-2">
-            <h4 className="font-semibold">{donation.name}</h4>
+            <h4 className="font-semibold flex items-center gap-2">
+              {donation.name}
+              {isRedeemed && (
+                <span className="text-green-700 text-xs bg-green-200 px-2 py-0.5 rounded flex items-center gap-1">
+                  <CheckCircle className="w-3 h-3" /> Redeemed
+                </span>
+              )}
+            </h4>
             <div className="flex space-x-2">
               <button
-                onClick={() => setIsEditing(true)}
-                className="text-blue-500 hover:text-blue-700"
-                title="Edit"
+                onClick={() => !isRedeemed && setIsEditing(true)}
+                disabled={isRedeemed}
+                className={`${
+                  isRedeemed
+                    ? "text-gray-400 cursor-not-allowed"
+                    : "text-blue-500 hover:text-blue-700"
+                }`}
+                title={isRedeemed ? "Cannot edit redeemed donation" : "Edit"}
               >
                 <Edit className="w-4 h-4" />
               </button>
@@ -162,13 +180,18 @@ const DonationItemDetails = ({ donation, onDelete, onUpdate }) => {
               </button>
             </div>
           </div>
-          {/* Show details */}
-          <p>Name: {donation.name}</p>
+
+          {/* Info */}
           <p>Quantity: {donation.quantity}</p>
           <p>Expires: {donation.expiry.toLocaleDateString()}</p>
-          <p>Pickup Location: {donation.pickupLocation}</p>
-          <p>Availability: {donation.availability}</p>
-          {/* Add more details as needed */}
+          <p>Pickup Location: {donation.pickupLocation || "—"}</p>
+          <p>Availability: {donation.availability || "—"}</p>
+
+          {isRedeemed && (
+            <p className="mt-2 text-xs text-green-600">
+              ✅ This item has been redeemed and is no longer available.
+            </p>
+          )}
         </div>
       )}
     </div>
