@@ -138,25 +138,33 @@ const { start, end, label } = useMemo(() => {
     // Here we assume usedAt exists; we still fallback below if missing.
 
     const unsubInv = onSnapshot(
-      invQ,
-      (snap) => {
-        const inRange = [];
-        const cats = new Set(allCategories);
+  invQ,
+  (snap) => {
+    console.log("Total inventory docs:", snap.size); // Should show 2
+    const inRange = [];
+    const cats = new Set(allCategories);
 
-        snap.forEach((d) => {
-          const x = d.data();
+    snap.forEach((d) => {
+      const x = d.data();
+      console.log("Processing item:", x.name || x.id, x); // Debug each item
 
-          // derive the effective timestamp
-          const usedAt =
-            (x.usedAt?.toDate?.() ? x.usedAt.toDate() : x.usedAt) ||
-            (x.updatedAt?.toDate?.() ? x.updatedAt.toDate() : x.updatedAt) ||
-            (x.createdAt?.toDate?.() ? x.createdAt.toDate() : x.createdAt);
-
-          // if no timestamp at all, skip (or treat as now)
-          if (!usedAt) return;
-
+      const usedAt =
+  (x.usedAt?.toDate?.() ? x.usedAt.toDate() : x.usedAt) ||
+  (x.updatedAt?.toDate?.() ? x.updatedAt.toDate() : x.updatedAt) ||
+  (x.createdAt?.toDate?.() ? x.createdAt.toDate() : x.createdAt) ||
+  new Date(); // This will catch items with no timestamps
+      console.log("Calculated usedAt:", usedAt);
+      
+      const inDateRange = usedAt >= start && usedAt <= end;
+      console.log("In date range?", inDateRange);
+      
+      if (!usedAt) {
+        console.log("SKIPPED: No usedAt timestamp");
+        return;
+      }
           // local range filter
           if (usedAt >= start && usedAt <= end) {
+            console.log("INCLUDED in results");
             const quantity = Number(x.quantity || 0);
             const category = x.category || "Other";
             cats.add(category);
@@ -389,7 +397,7 @@ const { start, end, label } = useMemo(() => {
         <div className="bg-white rounded-xl shadow-sm p-4">
           <p className="text-sm text-gray-500">Total Food Saved</p>
           <p className="text-3xl font-semibold">
-            {totals.totalSaved.toFixed(0)} kg
+            {totals.totalSaved.toFixed(0)} unit
           </p>
           <p
             className={`text-sm mt-1 ${
@@ -441,7 +449,7 @@ const { start, end, label } = useMemo(() => {
                 labels: dayLabels,
                 datasets: [
                   {
-                    label: "Food Saved (kg)",
+                    label: "Food Saved (unit)",
                     data: savedPerDay,
                     fill: true,
                     borderWidth: 2,
@@ -528,7 +536,7 @@ const { start, end, label } = useMemo(() => {
                         callbacks: {
                           label: (ctx) => {
                             const v = ctx.raw ?? 0;
-                            return `${ctx.label}: ${Number(v).toFixed(0)} kg`;
+                            return `${ctx.label}: ${Number(v).toFixed(0)} unit`;
                           },
                         },
                       },
@@ -545,7 +553,7 @@ const { start, end, label } = useMemo(() => {
                           (a, b) => a + b,
                           0
                         );
-                        const text = `${total.toFixed(0)} kg`;
+                        const text = `${total.toFixed(0)} unit`;
                         ctx.save();
                         ctx.font = "600 16px Inter, system-ui, sans-serif";
                         ctx.fillStyle = "#374151";
@@ -580,7 +588,7 @@ const { start, end, label } = useMemo(() => {
                           {x.label}
                         </span>
                         <span className="ml-3 shrink-0 font-semibold text-gray-800">
-                          {x.v.toFixed(0)} kg
+                          {x.v.toFixed(0)} unit
                         </span>
                       </li>
                     ))}
