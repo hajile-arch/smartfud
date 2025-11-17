@@ -4,6 +4,10 @@ import {
   collection,
   addDoc,
   query,
+  where,
+  setDoc,
+  getDocs,
+  serverTimestamp,
   getDoc,
   onSnapshot,
   doc,
@@ -52,7 +56,7 @@ const FoodInventory = () => {
     setAvailability("");
     setShowConvertModal(true);
   };
-
+const nameKeyOf = (s) => (s || "").trim().toLowerCase();
   // Handler for modal confirmation
   const handleConfirmConversion = async () => {
     if (!pickupLocation || !availability) {
@@ -175,46 +179,73 @@ const FoodInventory = () => {
 
   // Add or update item
   const handleSubmit = async (formData, editingItem) => {
-    // Validation
-    if (
-      !formData.name ||
-      !formData.quantity ||
-      !formData.expiry ||
-      !formData.category
-    ) {
-      alert("Please complete all required fields");
-      return;
-    }
+  // Validation
+  if (!formData.name || !formData.quantity || !formData.expiry || !formData.category) {
+    alert("Please complete all required fields");
+    return;
+  }
+  if (!user) {
+    alert("Please log in.");
+    return;
+  }
 
-    try {
-      const itemData = {
-        ...formData,
-        quantity: parseInt(formData.quantity),
-        expiry: new Date(formData.expiry),
-        createdAt: new Date(),
-        status: "active",
-        userId: user.uid,
-      };
+  try {
+    const itemsCol = collection(db, "users", user.uid, "inventory");
+    const nameKey = nameKeyOf(formData.name);
 
-      if (editingItem) {
-        // Update existing item
-        await updateDoc(
-          doc(db, "users", user.uid, "inventory", editingItem.id),
-          itemData
-        );
-      } else {
-        // Add new item
-        await addDoc(collection(db, "users", user.uid, "inventory"), itemData);
+    const payload = {
+      name: formData.name.trim(),
+      nameKey,
+      quantity: Number(formData.quantity || 0),
+      expiry: new Date(formData.expiry),
+      category: formData.category || "Other",
+      location: formData.location || "",
+      notes: formData.notes || "",
+      status: "active",
+      userId: user.uid,
+      updatedAt: serverTimestamp(),
+    };
+
+    if (!editingItem) {
+      // CREATE: use nameKey as the doc ID (hard uniqueness)
+      const ref = doc(itemsCol, nameKey);
+      const exists = await getDoc(ref);
+      if (exists.exists()) {
+        alert(`⚠️ "${formData.name}" already exists.`);
+        return;
       }
+      await setDoc(ref, { ...payload, createdAt: serverTimestamp() });
+    } else {
+      // EDIT: if name didn't change (same nameKey), just update existing doc
+      const oldId = editingItem.id;
+      const oldNameKey = editingItem.nameKey || nameKeyOf(editingItem.name);
 
-      // Reset form and close modal
-      setShowForm(false);
-      setEditingItem(null);
-    } catch (error) {
-      console.error("Error saving item:", error);
-      alert("Error saving item. Please try again.");
+      if (oldNameKey === nameKey) {
+        // same canonical name -> update in place
+        await updateDoc(doc(itemsCol, oldId), payload);
+      } else {
+        // RENAMED: move to new ID, delete old
+        const newRef = doc(itemsCol, nameKey);
+        const clash = await getDoc(newRef);
+        if (clash.exists()) {
+          alert(`⚠️ Another item named "${formData.name}" already exists.`);
+          return;
+        }
+        // create new doc, then delete old doc
+        await setDoc(newRef, { ...payload, createdAt: editingItem.createdAt || serverTimestamp() });
+        await deleteDoc(doc(itemsCol, oldId));
+      }
     }
-  };
+
+    // Reset and close
+    setShowForm(false);
+    setEditingItem(null);
+  } catch (err) {
+    console.error("Error saving item:", err);
+    alert("Error saving item. Please try again.");
+  }
+};
+
   // Edit item
   const handleEdit = (item) => {
     setEditingItem(item);
@@ -349,7 +380,23 @@ const FoodInventory = () => {
           </button>
         </div>
       </div>
-
+       {/* ADMIN: one-time tools (show only if logged in) */}
+     {user?.full_name === "e" && (
+       <div className="mb-6 flex gap-3">
+         <button
+           onClick={() => backfillNameKeys(user)}
+           className="px-3 py-2 rounded-md bg-yellow-500 text-white hover:bg-yellow-600"
+         >
+          Backfill nameKeys
+         </button>
+         <button
+          onClick={() => migrateInventoryToNameKeys(user)}
+           className="px-3 py-2 rounded-md bg-red-500 text-white hover:bg-red-600"
+        >           Migrate IDs to nameKey
+         </button>
+       </div>
+     )}
+       
       {/* Add/Edit Form Modal */}
       <FoodInventoryForm
         showForm={showForm}
@@ -607,5 +654,45 @@ const FoodInventory = () => {
     </div>
   );
 };
+const nameKeyOf = (s) => (s || "").trim().toLowerCase();
+
+export async function backfillNameKeys(user) {
+  if (!user) return alert("Login first");
+  const snap = await getDocs(collection(db, "users", user.uid, "inventory"));
+  const ops = [];
+  snap.forEach(d => {
+    const data = d.data();
+    const nk = nameKeyOf(data.name);
+    if (data.nameKey !== nk) {
+      ops.push(updateDoc(d.ref, { nameKey: nk, updatedAt: serverTimestamp() }));
+    }
+  });
+  await Promise.all(ops);
+  alert("Backfilled nameKey for existing items.");
+}
+
+export async function migrateInventoryToNameKeys(user) {
+  if (!user) return alert("Login first");
+  const itemsCol = collection(db, "users", user.uid, "inventory");
+  const snap = await getDocs(itemsCol);
+
+  for (const d of snap.docs) {
+    const data = d.data();
+    const nk = nameKeyOf(data.name);
+    if (d.id === nk) continue;
+
+    const newRef = doc(itemsCol, nk);
+    const exists = await getDoc(newRef);
+    if (exists.exists()) {
+      console.warn(`Skip migrating "${data.name}" — target already exists.`);
+      await updateDoc(d.ref, { nameKey: nk, updatedAt: serverTimestamp() });
+      continue;
+    }
+
+    await setDoc(newRef, { ...data, nameKey: nk, updatedAt: serverTimestamp() }, { merge: true });
+    await deleteDoc(d.ref);
+  }
+  alert("Migration complete.");
+}
 
 export default FoodInventory;
