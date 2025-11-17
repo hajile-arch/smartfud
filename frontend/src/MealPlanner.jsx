@@ -78,6 +78,8 @@ export default function MealPlanner({ user }) {
   const [selectedDate, setSelectedDate] = useState(ymd(new Date())); // default today
   const [selectedMeal, setSelectedMeal] = useState("breakfast");
 
+  const reservedMap = new Map();
+
   // Basic recipes list
   const basicRecipes = [
     {
@@ -210,7 +212,29 @@ export default function MealPlanner({ user }) {
     setModalInitial(existing.ingredients || []);
     setModalOpen(true);
   };
+
+  const byName = (list) => {
+    const m = new Map();
+    list.forEach((it) => m.set((it.name || "").trim().toLowerCase(), it));
+    return m;
+  };
+  const nameMap = byName(inventory);
+  const normalizeIngredients = (ings, inventory) => {
+    const map = byName(inventory);
+    return (ings || []).map((ing) => {
+      const name = (ing.name || "").trim();
+      const qty = Number(ing.quantity || 0);
+      const match = map.get(name.toLowerCase());
+      return {
+        name,
+        quantity: Number.isFinite(qty) ? qty : 0,
+        itemId: match ? match.id : ing.itemId ?? null,
+      };
+    });
+  };
+
   const onModalSave = (ingredients) => {
+    const normalized = normalizeIngredients(ingredients, inventory);
     setPlan((prev) => {
       const existing = prev[modalSlotKey] || {
         title: "",
@@ -218,7 +242,10 @@ export default function MealPlanner({ user }) {
         ingredients: [],
       };
       const title = existing.title || "Planned meal";
-      return { ...prev, [modalSlotKey]: { ...existing, title, ingredients } };
+      return {
+        ...prev,
+        [modalSlotKey]: { ...existing, title, ingredients: normalized },
+      };
     });
     setModalOpen(false);
   };
@@ -250,130 +277,168 @@ export default function MealPlanner({ user }) {
   };
 
   // Save plan
- const saveWeek = async () => {
-  if (!user) return alert("Please log in.");
+  const saveWeek = async () => {
+    if (!user) return alert("Please log in.");
 
-  // 1) Save the meal plan doc
-  const planRef = doc(db, "users", user.uid, "mealPlans", weekKey);
-await setDoc(
-  planRef,
-  { weekStart, slots: plan, updatedAt: serverTimestamp() }
-  // ⬆️ no { merge: true } here — overwrite entire doc, including the slots map
-);
+    // 1) Save the meal plan doc
+    const planRef = doc(db, "users", user.uid, "mealPlans", weekKey);
+    await setDoc(
+      planRef,
+      { weekStart, slots: plan, updatedAt: serverTimestamp() } // overwrite
+    );
 
-  // 2) Compute reservations per item from the plan
-  const reservedMap = new Map(); // itemId -> total reserved qty
-  Object.values(plan || {}).forEach((slot) => {
-    (slot.ingredients || []).forEach((ing) => {
-      if (!ing.itemId) return;
-      reservedMap.set(
-        ing.itemId,
-        (reservedMap.get(ing.itemId) || 0) + Number(ing.quantity || 0)
-      );
+    // 2) Compute reservations per item from the plan
+    Object.values(plan || {}).forEach((slot) => {
+      (slot.ingredients || []).forEach((ing) => {
+        const qty = Number(ing.quantity || 0);
+        if (!qty) return;
+
+        let itemId = ing.itemId;
+        if (!itemId) {
+          const match = nameMap.get((ing.name || "").trim().toLowerCase());
+          itemId = match?.id || null;
+        }
+        if (!itemId) return;
+
+        reservedMap.set(itemId, (reservedMap.get(itemId) || 0) + qty);
+      });
     });
-  });
 
-  // 3) Prepare batch
-  const batch = writeBatch(db);
+    // 3) Prepare batch
+    const batch = writeBatch(db);
 
-  // Inventory updates
-  inventory.forEach((it) => {
-    const wanted = reservedMap.get(it.id) || 0;
-    const newStatus =
-      wanted > 0 ? "planned" : it.status === "planned" ? "active" : it.status;
-    batch.update(doc(db, "users", user.uid, "inventory", it.id), {
-      reserved: wanted,
-      status: newStatus,
-    });
-  });
+    // Inventory updates (exactly one update per doc)
+    inventory.forEach((it) => {
+      const wanted = reservedMap.get(it.id) || 0;
 
-  // Prefetch existing notifications for this week (so we can preserve read & createdAt)
-  const existingMap = new Map(); // notifId -> { read, createdAt, ... }
-  const qNotifs = query(
-    collection(db, "users", user.uid, "notifications"),
-    where("weekKey", "==", weekKey)
-  );
-  const snapNotifs = await getDocs(qNotifs);
-  snapNotifs.forEach((d) => existingMap.set(d.id, d.data()));
+      // Prevent over-reservation
+      const clamped = Math.min(wanted, it.quantity);
 
-  // Local "today" at midnight
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+      // Determine status based on clamped reservation
+      const newStatus =
+        clamped > 0
+          ? "planned"
+          : it.status === "planned"
+          ? "active"
+          : it.status;
 
-  // === Notifications: upsert per (date, slot) and delete cleared ones ===
-  for (const day of weekDays) {
-    const dStr = ymd(day);
-    const isPast = new Date(`${dStr}T00:00:00`) < today;
+      batch.update(doc(db, "users", user.uid, "inventory", it.id), {
+        reserved: clamped,
+        status: newStatus,
+      });
 
-    for (const slot of SLOT_KEYS) {
-      const key = `${dStr}:${slot}`;
-      const entry = plan[key];
-      const notifId = `meal_${dStr}_${slot}`;
-      const notifRef = doc(db, "users", user.uid, "notifications", notifId);
-
-      // If slot cleared -> delete any existing notif for this slot (past or future)
-      if (!entry?.title) {
-        batch.delete(notifRef);
-        continue;
+      // Optional: warn if clamped
+      if (wanted > it.quantity) {
+        console.warn(
+          `⚠️ Not enough ${it.name}: wanted ${wanted}, available ${it.quantity}`
+        );
       }
+    });
 
-      // Skip (do not create/update) notifications for past days
-      if (isPast) continue;
+    const overReserved = [];
+    inventory.forEach((it) => {
+      const wanted = reservedMap.get(it.id) || 0;
+      if (wanted > it.quantity) {
+        overReserved.push({ name: it.name, wanted, available: it.quantity });
+      }
+    });
 
-      const reminderAt = new Date(day);
-      if (slot === "breakfast") reminderAt.setHours(8, 0, 0, 0);
-      else if (slot === "lunch") reminderAt.setHours(12, 0, 0, 0);
-      else if (slot === "dinner") reminderAt.setHours(18, 0, 0, 0);
-      else reminderAt.setHours(16, 0, 0, 0);
+    if (overReserved.length > 0) {
+      alert(
+        "You’ve planned more than you have:\n" +
+          overReserved
+            .map((x) => `- ${x.name}: need ${x.wanted}, have ${x.available}`)
+            .join("\n")
+      );
+      return; // stop saving if you prefer to force user correction
+    }
 
-      const prev = existingMap.get(notifId);
+    // Prefetch existing notifications for this week (so we can preserve read & createdAt)
+    const existingMap = new Map(); // notifId -> { read, createdAt, ... }
+    const qNotifs = query(
+      collection(db, "users", user.uid, "notifications"),
+      where("weekKey", "==", weekKey)
+    );
+    const snapNotifs = await getDocs(qNotifs);
+    snapNotifs.forEach((d) => existingMap.set(d.id, d.data()));
 
-      const basePayload = {
-        type: "meal",
-        weekKey,
-        slot,
-        date: dStr,
-        title: `Reminder: ${slot} — ${entry.title}`,
-        body: entry.note || "Tap to view your plan.",
-        target: { route: "/meal-planner", params: { date: dStr, slot } },
-        reminderAt,
-        updatedAt: serverTimestamp(),
-      };
+    // Local "today" at midnight
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-      if (prev) {
-        // Preserve read + createdAt; only update the rest
-        batch.set(
-          notifRef,
-          {
-            ...basePayload,
-            read: prev.read ?? false,
-            createdAt: prev.createdAt ?? serverTimestamp(),
-          },
-          { merge: true }
-        );
-      } else {
-        // New notification: set read=false and createdAt now
-        batch.set(
-          notifRef,
-          {
-            ...basePayload,
-            read: false,
-            createdAt: serverTimestamp(),
-          },
-          { merge: false }
-        );
+    // === Notifications: upsert per (date, slot) and delete cleared ones ===
+    for (const day of weekDays) {
+      const dStr = ymd(day);
+      const isPast = new Date(`${dStr}T00:00:00`) < today;
+
+      for (const slot of SLOT_KEYS) {
+        const key = `${dStr}:${slot}`;
+        const entry = plan[key];
+        const notifId = `meal_${dStr}_${slot}`;
+        const notifRef = doc(db, "users", user.uid, "notifications", notifId);
+
+        // If slot cleared -> delete any existing notif for this slot (past or future)
+        if (!entry?.title) {
+          batch.delete(notifRef);
+          continue;
+        }
+
+        // Skip (do not create/update) notifications for past days
+        if (isPast) continue;
+
+        const reminderAt = new Date(day);
+        if (slot === "breakfast") reminderAt.setHours(8, 0, 0, 0);
+        else if (slot === "lunch") reminderAt.setHours(12, 0, 0, 0);
+        else if (slot === "dinner") reminderAt.setHours(18, 0, 0, 0);
+        else reminderAt.setHours(16, 0, 0, 0);
+
+        const prev = existingMap.get(notifId);
+
+        const basePayload = {
+          type: "meal",
+          weekKey,
+          slot,
+          date: dStr,
+          title: `Reminder: ${slot} — ${entry.title}`,
+          body: entry.note || "Tap to view your plan.",
+          target: { route: "/meal-planner", params: { date: dStr, slot } },
+          reminderAt,
+          updatedAt: serverTimestamp(),
+        };
+
+        if (prev) {
+          // Preserve read + createdAt; only update the rest
+          batch.set(
+            notifRef,
+            {
+              ...basePayload,
+              read: prev.read ?? false,
+              createdAt: prev.createdAt ?? serverTimestamp(),
+            },
+            { merge: true }
+          );
+        } else {
+          // New notification: set read=false and createdAt now
+          batch.set(
+            notifRef,
+            {
+              ...basePayload,
+              read: false,
+              createdAt: serverTimestamp(),
+            },
+            { merge: false }
+          );
+        }
       }
     }
-  }
 
-  // 4) Commit once
-  await batch.commit();
+    // 4) Commit once
+    await batch.commit();
 
-  alert(
-    "Meal plan saved. Inventory reservations updated and reminders queued."
-  );
-};
-
+    alert(
+      "Meal plan saved. Inventory reservations updated and reminders queued."
+    );
+  };
 
   // Add recipe to plan
   const handleAddRecipe = (recipe) => {
@@ -422,55 +487,81 @@ await setDoc(
   const handleConfirmDateMeal = (date, meal) => {
     if (tempRecipe) {
       const key = `${date}:${meal}`;
+      const addList = normalizeIngredients(tempRecipe.ingredients, inventory);
+
       setPlan((prev) => {
         const existing = prev[key] || {
           title: tempRecipe.name,
           note: tempRecipe.notes,
           ingredients: [],
         };
-        const newIngredients = [...existing.ingredients];
+        const merged = [...existing.ingredients];
 
-        tempRecipe.ingredients.forEach((ing) => {
-          const found = newIngredients.find((i) => i.name === ing.name);
-          if (found) {
-            found.quantity += ing.quantity;
+        addList.forEach((newIng) => {
+          const idx = merged.findIndex(
+            (i) => (i.name || "").toLowerCase() === newIng.name.toLowerCase()
+          );
+          if (idx >= 0) {
+            const cur = merged[idx];
+            merged[idx] = {
+              ...cur,
+              quantity:
+                Number(cur.quantity || 0) + Number(newIng.quantity || 0),
+              itemId: cur.itemId || newIng.itemId || null,
+            };
           } else {
-            newIngredients.push({ ...ing });
+            merged.push(newIng);
           }
         });
-        return { ...prev, [key]: { ...existing, ingredients: newIngredients } };
+
+        return { ...prev, [key]: { ...existing, ingredients: merged } };
       });
     }
     setShowDateMealModal(false);
     setTempRecipe(null);
   };
+
   useEffect(() => {
     if (pendingRecipe && pendingDate && pendingMeal) {
       const key = `${pendingDate}:${pendingMeal}`;
+      const addList = normalizeIngredients(
+        pendingRecipe.ingredients,
+        inventory
+      );
+
       setPlan((prev) => {
         const existing = prev[key] || {
           title: pendingRecipe.name,
           note: pendingRecipe.notes,
           ingredients: [],
         };
-        const newIngredients = [...existing.ingredients];
+        const merged = [...existing.ingredients];
 
-        pendingRecipe.ingredients.forEach((ing) => {
-          const found = newIngredients.find((i) => i.name === ing.name);
-          if (found) {
-            found.quantity += ing.quantity;
+        addList.forEach((newIng) => {
+          const idx = merged.findIndex(
+            (i) => (i.name || "").toLowerCase() === newIng.name.toLowerCase()
+          );
+          if (idx >= 0) {
+            const cur = merged[idx];
+            merged[idx] = {
+              ...cur,
+              quantity:
+                Number(cur.quantity || 0) + Number(newIng.quantity || 0),
+              itemId: cur.itemId || newIng.itemId || null,
+            };
           } else {
-            newIngredients.push({ ...ing });
+            merged.push(newIng);
           }
         });
-        return { ...prev, [key]: { ...existing, ingredients: newIngredients } };
+
+        return { ...prev, [key]: { ...existing, ingredients: merged } };
       });
-      // Clear pending
+
       setPendingRecipe(null);
       setPendingDate(null);
       setPendingMeal(null);
     }
-  }, [pendingRecipe, pendingDate, pendingMeal]);
+  }, [pendingRecipe, pendingDate, pendingMeal, inventory]);
 
   useEffect(() => {
     console.log("Updated plan:", plan);
